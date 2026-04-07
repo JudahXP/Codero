@@ -107,14 +107,27 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>HEARTS</Text>
             </View>
             <View style={styles.statCard}>
-              <Ionicons name="medal" size={28} color="#00FF88" />
-              <Text style={styles.statValue}>{user?.badges?.length || 0}</Text>
-              <Text style={styles.statLabel}>BADGES</Text>
+              <Ionicons name="diamond" size={28} color="#00BFFF" />
+              <Text style={styles.statValue}>{user?.gems || 0}</Text>
+              <Text style={styles.statLabel}>GEMS</Text>
             </View>
           </View>
 
           {/* Menu Items */}
           <View style={styles.menuSection}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/settings')}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.menuIcon, { backgroundColor: 'rgba(0, 191, 255, 0.1)' }]}>
+                  <Ionicons name="settings" size={22} color="#00BFFF" />
+                </View>
+                <Text style={styles.menuText}>SETTINGS</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#555" />
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => router.push('/badges')}

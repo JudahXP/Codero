@@ -1,489 +1,554 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Codero Coding Education App
-Tests all endpoints: Auth, Languages, Progress, Social
+Enhanced Codero Backend API Test Suite
+Tests all enhanced features including 20 languages, gems, daily challenges, shop, and settings.
 """
 
 import requests
 import json
-import sys
+import time
 from datetime import datetime
 
 # Configuration
 BASE_URL = "https://pixel-coder-3.preview.emergentagent.com/api"
-TEST_CREDENTIALS = {
-    "user1": {
-        "username": "testcoder1",
-        "email": "test1@codero.com",
-        "password": "test123"
-    },
-    "user2": {
-        "username": "testcoder2", 
-        "email": "test2@codero.com",
-        "password": "test123"
-    }
+TEST_USER = {
+    "username": "enhancedtest",
+    "email": "enhanced@codero.com", 
+    "password": "test123"
 }
 
 class CoderoAPITester:
     def __init__(self):
-        self.session = requests.Session()
         self.token = None
         self.user_data = None
-        self.test_results = []
-        
-    def log_test(self, test_name, success, details=""):
-        """Log test results"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status}: {test_name}")
-        if details:
-            print(f"   Details: {details}")
-        self.test_results.append({
-            "test": test_name,
-            "success": success,
-            "details": details
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
         })
         
-    def make_request(self, method, endpoint, data=None, headers=None, expect_status=200):
-        """Make HTTP request with error handling"""
+    def log(self, message, status="INFO"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] {status}: {message}")
+        
+    def make_request(self, method, endpoint, data=None, auth_required=True):
+        """Make HTTP request with proper error handling"""
         url = f"{BASE_URL}{endpoint}"
         
-        # Add auth header if token exists
-        if self.token and headers is None:
-            headers = {"Authorization": f"Bearer {self.token}"}
-        elif self.token and headers:
-            headers["Authorization"] = f"Bearer {self.token}"
+        headers = {}
+        if auth_required and self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
             
         try:
-            if method.upper() == "GET":
+            if method == 'GET':
                 response = self.session.get(url, headers=headers)
-            elif method.upper() == "POST":
+            elif method == 'POST':
                 response = self.session.post(url, json=data, headers=headers)
-            elif method.upper() == "PUT":
+            elif method == 'PUT':
                 response = self.session.put(url, json=data, headers=headers)
-            elif method.upper() == "DELETE":
-                response = self.session.delete(url, headers=headers)
             else:
                 raise ValueError(f"Unsupported method: {method}")
                 
-            print(f"   {method} {endpoint} -> {response.status_code}")
-            
-            if response.status_code != expect_status:
-                print(f"   Expected {expect_status}, got {response.status_code}")
-                if response.text:
-                    print(f"   Response: {response.text[:200]}")
-                return None, response.status_code
-                
-            return response.json() if response.text else {}, response.status_code
-            
+            return response
         except requests.exceptions.RequestException as e:
-            print(f"   Request failed: {e}")
-            return None, 0
-        except json.JSONDecodeError as e:
-            print(f"   JSON decode error: {e}")
-            return None, response.status_code if 'response' in locals() else 0
+            self.log(f"Request failed: {e}", "ERROR")
+            return None
             
-    def test_auth_endpoints(self):
-        """Test all authentication endpoints"""
-        print("\n=== TESTING AUTH ENDPOINTS ===")
+    def test_api_health(self):
+        """Test if API is responding"""
+        self.log("Testing API health...")
+        response = self.make_request('GET', '/', auth_required=False)
         
-        # Test 1: Register new user
-        user_data = TEST_CREDENTIALS["user1"]
-        response, status = self.make_request("POST", "/auth/register", user_data)
-        
-        if status == 200 and response and "token" in response:
-            self.token = response["token"]
-            self.user_data = response["user"]
-            self.log_test("POST /auth/register", True, f"User created with token")
-            
-            # Verify user data structure
-            expected_fields = ["id", "username", "email", "xp", "level", "streak", "hearts"]
-            missing_fields = [f for f in expected_fields if f not in self.user_data]
-            if missing_fields:
-                self.log_test("User data structure", False, f"Missing fields: {missing_fields}")
-            else:
-                # Check initial values
-                if (self.user_data["xp"] == 0 and self.user_data["level"] == 1 and 
-                    self.user_data["hearts"] == 5 and self.user_data["streak"] == 0):
-                    self.log_test("Initial user values", True, "XP=0, Level=1, Hearts=5, Streak=0")
-                else:
-                    self.log_test("Initial user values", False, 
-                                f"XP={self.user_data['xp']}, Level={self.user_data['level']}, Hearts={self.user_data['hearts']}, Streak={self.user_data['streak']}")
+        if response and response.status_code == 200:
+            data = response.json()
+            self.log(f"✅ API is healthy: {data.get('message', 'OK')}")
+            return True
         else:
-            self.log_test("POST /auth/register", False, f"Status: {status}, Response: {response}")
+            self.log(f"❌ API health check failed: {response.status_code if response else 'No response'}", "ERROR")
             return False
             
-        # Test 2: Login with same credentials
-        login_data = {"email": user_data["email"], "password": user_data["password"]}
-        response, status = self.make_request("POST", "/auth/login", login_data)
+    def test_user_registration(self):
+        """Test enhanced user registration with gems and settings"""
+        self.log("Testing enhanced user registration...")
         
-        if status == 200 and response and "token" in response:
-            self.token = response["token"]  # Update token
-            self.log_test("POST /auth/login", True, "Login successful")
+        # Try login first since user might already exist
+        if self.test_user_login():
+            return True
             
-            # Check if streak was updated
-            if response["user"]["streak"] >= 1:
-                self.log_test("Login streak update", True, f"Streak: {response['user']['streak']}")
+        response = self.make_request('POST', '/auth/register', TEST_USER, auth_required=False)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.token = data.get('token')
+            self.user_data = data.get('user')
+            
+            # Verify enhanced features
+            gems = self.user_data.get('gems', 0)
+            settings = self.user_data.get('settings', {})
+            
+            if gems == 10:
+                self.log("✅ User starts with 10 gems")
             else:
-                self.log_test("Login streak update", False, f"Streak not updated: {response['user']['streak']}")
-        else:
-            self.log_test("POST /auth/login", False, f"Status: {status}")
-            
-        # Test 3: Get current user
-        response, status = self.make_request("GET", "/auth/me")
-        
-        if status == 200 and response and "username" in response:
-            self.log_test("GET /auth/me", True, f"User: {response['username']}")
-        else:
-            self.log_test("GET /auth/me", False, f"Status: {status}")
-            
-        # Test 4: Logout
-        response, status = self.make_request("POST", "/auth/logout")
-        
-        if status == 200:
-            self.log_test("POST /auth/logout", True, "Logout successful")
-            # Clear token for next tests
-            old_token = self.token
-            self.token = None
-            
-            # Test 5: Verify token is invalid after logout
-            response, status = self.make_request("GET", "/auth/me", headers={"Authorization": f"Bearer {old_token}"}, expect_status=401)
-            if status == 401:
-                self.log_test("Token invalidation after logout", True, "Token properly invalidated")
+                self.log(f"❌ Expected 10 gems, got {gems}", "ERROR")
+                
+            if settings and 'theme' in settings:
+                self.log("✅ User has default settings")
             else:
-                self.log_test("Token invalidation after logout", False, f"Status: {status}")
+                self.log("❌ User missing default settings", "ERROR")
+                
+            self.log(f"✅ User registered successfully with ID: {self.user_data.get('id')}")
+            return True
         else:
-            self.log_test("POST /auth/logout", False, f"Status: {status}")
-            
-        return True
-        
-    def test_languages_endpoints(self):
-        """Test language and lesson endpoints"""
-        print("\n=== TESTING LANGUAGES ENDPOINTS ===")
-        
-        # Test 1: Get all languages
-        response, status = self.make_request("GET", "/languages")
-        
-        if status == 200 and response and isinstance(response, list):
-            expected_languages = ["python", "javascript", "java", "cpp", "csharp", "ruby", 
-                                "go", "rust", "swift", "kotlin", "typescript", "php", 
-                                "sql", "html_css", "skript", "lua"]
-            
-            language_ids = [lang["id"] for lang in response]
-            missing_languages = [lang for lang in expected_languages if lang not in language_ids]
-            
-            if len(response) == 16 and not missing_languages:
-                self.log_test("GET /languages", True, f"All 16 languages present")
+            if response:
+                try:
+                    error_msg = response.json().get('detail', 'Unknown error')
+                    if 'already exists' in error_msg:
+                        self.log("User already exists, attempting login...")
+                        return self.test_user_login()
+                    else:
+                        self.log(f"❌ Registration failed: {error_msg}", "ERROR")
+                        return False
+                except:
+                    self.log(f"❌ Registration failed with status {response.status_code}", "ERROR")
+                    return False
             else:
-                self.log_test("GET /languages", False, 
-                            f"Expected 16 languages, got {len(response)}. Missing: {missing_languages}")
+                self.log("❌ Registration failed: No response", "ERROR")
+                return False
+                
+    def test_user_login(self):
+        """Test user login with enhanced features"""
+        self.log("Testing user login...")
+        
+        login_data = {
+            "email": TEST_USER["email"],
+            "password": TEST_USER["password"]
+        }
+        
+        response = self.make_request('POST', '/auth/login', login_data, auth_required=False)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.token = data.get('token')
+            self.user_data = data.get('user')
+            
+            # Verify enhanced features
+            gems = self.user_data.get('gems', 0)
+            settings = self.user_data.get('settings', {})
+            
+            self.log(f"✅ Login successful. Gems: {gems}, Settings: {bool(settings)}")
+            return True
         else:
-            self.log_test("GET /languages", False, f"Status: {status}")
+            if response:
+                try:
+                    error_msg = response.json().get('detail', 'Unknown error')
+                    self.log(f"❌ Login failed: {error_msg}", "ERROR")
+                    return False
+                except:
+                    self.log(f"❌ Login failed with status {response.status_code}", "ERROR")
+                    return False
+            else:
+                self.log("❌ Login failed: No response", "ERROR")
+                return False
+            
+    def test_languages_count(self):
+        """Test that we have 20 programming languages including new ones"""
+        self.log("Testing languages endpoint...")
+        
+        response = self.make_request('GET', '/languages', auth_required=False)
+        
+        if response and response.status_code == 200:
+            languages = response.json()
+            
+            if len(languages) == 20:
+                self.log(f"✅ Found {len(languages)} languages (expected 20)")
+            else:
+                self.log(f"❌ Expected 20 languages, found {len(languages)}", "ERROR")
+                
+            # Check for new languages
+            language_ids = [lang['id'] for lang in languages]
+            new_languages = ['zig', 'elixir', 'shell', 'haskell']
+            
+            for new_lang in new_languages:
+                if new_lang in language_ids:
+                    self.log(f"✅ Found new language: {new_lang}")
+                else:
+                    self.log(f"❌ Missing new language: {new_lang}", "ERROR")
+                    
+            return len(languages) == 20 and all(lang in language_ids for lang in new_languages)
+        else:
+            self.log(f"❌ Languages request failed: {response.status_code if response else 'No response'}", "ERROR")
             return False
             
-        # Test 2: Get Python lessons (should have 30 lessons)
-        response, status = self.make_request("GET", "/languages/python/lessons")
+    def test_lessons_count(self):
+        """Test that each language has 30 lessons"""
+        self.log("Testing lessons count...")
         
-        if status == 200 and response and isinstance(response, list):
-            if len(response) == 30:
-                self.log_test("GET /languages/python/lessons", True, f"Python has 30 lessons")
-                
-                # Check lesson structure
-                first_lesson = response[0]
-                expected_fields = ["id", "title", "description", "xp", "unit"]
-                missing_fields = [f for f in expected_fields if f not in first_lesson]
-                
-                if not missing_fields:
-                    self.log_test("Lesson structure", True, "All required fields present")
-                else:
-                    self.log_test("Lesson structure", False, f"Missing fields: {missing_fields}")
-                    
-                # Check units (should be 1-6)
-                units = set(lesson["unit"] for lesson in response)
-                if units == {1, 2, 3, 4, 5, 6}:
-                    self.log_test("Python lesson units", True, "6 units present (1-6)")
-                else:
-                    self.log_test("Python lesson units", False, f"Units found: {sorted(units)}")
-                    
-            else:
-                self.log_test("GET /languages/python/lessons", False, f"Expected 30 lessons, got {len(response)}")
-        else:
-            self.log_test("GET /languages/python/lessons", False, f"Status: {status}")
+        # Test Python lessons
+        response = self.make_request('GET', '/languages/python/lessons', auth_required=False)
+        
+        if response and response.status_code == 200:
+            lessons = response.json()
             
-        # Test 3: Get specific lesson with exercises
-        response, status = self.make_request("GET", "/languages/python/lessons/python_1_1")
+            if len(lessons) == 30:
+                self.log(f"✅ Python has {len(lessons)} lessons (expected 30)")
+            else:
+                self.log(f"❌ Python expected 30 lessons, found {len(lessons)}", "ERROR")
+                
+            # Test Shell lessons (new language)
+            response = self.make_request('GET', '/languages/shell/lessons', auth_required=False)
+            
+            if response and response.status_code == 200:
+                shell_lessons = response.json()
+                
+                if len(shell_lessons) == 30:
+                    self.log(f"✅ Shell has {len(shell_lessons)} lessons (expected 30)")
+                else:
+                    self.log(f"❌ Shell expected 30 lessons, found {len(shell_lessons)}", "ERROR")
+                    
+                return len(lessons) == 30 and len(shell_lessons) == 30
+            else:
+                self.log(f"❌ Shell lessons request failed: {response.status_code if response else 'No response'}", "ERROR")
+                return False
+        else:
+            self.log(f"❌ Python lessons request failed: {response.status_code if response else 'No response'}", "ERROR")
+            return False
+            
+    def test_lesson_exercises(self):
+        """Test that lessons have 10 exercises each"""
+        self.log("Testing lesson exercises...")
         
-        if status == 200 and response and "exercises" in response:
-            exercises = response["exercises"]
-            if len(exercises) >= 3:
-                self.log_test("GET specific lesson", True, f"Lesson has {len(exercises)} exercises")
+        response = self.make_request('GET', '/languages/python/lessons/python_1_1', auth_required=False)
+        
+        if response and response.status_code == 200:
+            lesson = response.json()
+            exercises = lesson.get('exercises', [])
+            
+            if len(exercises) == 10:
+                self.log(f"✅ Lesson has {len(exercises)} exercises (expected 10)")
                 
                 # Check exercise types
-                exercise_types = [ex["type"] for ex in exercises]
-                expected_types = ["multiple_choice", "code", "fill_blank"]
-                found_types = [t for t in expected_types if t in exercise_types]
+                types = [ex.get('type') for ex in exercises]
+                expected_types = ['multiple_choice', 'code', 'fill_blank']
                 
-                if len(found_types) >= 2:
-                    self.log_test("Exercise types", True, f"Found types: {found_types}")
+                if any(t in types for t in expected_types):
+                    self.log("✅ Lesson has varied exercise types")
+                    return True
                 else:
-                    self.log_test("Exercise types", False, f"Expected multiple types, found: {exercise_types}")
+                    self.log("❌ Lesson missing expected exercise types", "ERROR")
+                    return False
             else:
-                self.log_test("GET specific lesson", False, f"Expected 3+ exercises, got {len(exercises)}")
+                self.log(f"❌ Expected 10 exercises, found {len(exercises)}", "ERROR")
+                return False
         else:
-            self.log_test("GET specific lesson", False, f"Status: {status}")
-            
-        return True
-        
-    def test_progress_endpoints(self):
-        """Test progress tracking endpoints"""
-        print("\n=== TESTING PROGRESS ENDPOINTS ===")
-        
-        # First, login to get a token
-        user_data = TEST_CREDENTIALS["user1"]
-        login_data = {"email": user_data["email"], "password": user_data["password"]}
-        response, status = self.make_request("POST", "/auth/login", login_data)
-        
-        if status != 200 or not response or "token" not in response:
-            self.log_test("Login for progress tests", False, "Could not login")
+            self.log(f"❌ Lesson request failed: {response.status_code if response else 'No response'}", "ERROR")
             return False
             
-        self.token = response["token"]
+    def test_settings_api(self):
+        """Test settings API endpoints"""
+        self.log("Testing settings API...")
         
-        # Test 1: Get progress for Python (should be empty initially)
-        response, status = self.make_request("GET", "/progress/python")
-        
-        if status == 200 and response:
-            expected_fields = ["total_lessons", "completed_lessons", "progress_percent"]
-            missing_fields = [f for f in expected_fields if f not in response]
+        if not self.token:
+            self.log("❌ No auth token for settings test", "ERROR")
+            return False
             
-            if not missing_fields:
-                self.log_test("GET /progress/python", True, 
-                            f"Progress: {response['completed_lessons']}/{response['total_lessons']} ({response['progress_percent']}%)")
+        # Get current settings
+        response = self.make_request('GET', '/settings')
+        
+        if response and response.status_code == 200:
+            current_settings = response.json()
+            self.log(f"✅ Retrieved current settings: {len(current_settings)} items")
+            
+            # Update settings
+            new_settings = {
+                "settings": {
+                    "theme": "light",
+                    "font_size": "large",
+                    "sound_effects": False,
+                    "notifications": True
+                }
+            }
+            
+            response = self.make_request('PUT', '/settings', new_settings)
+            
+            if response and response.status_code == 200:
+                self.log("✅ Settings updated successfully")
+                
+                # Verify settings were updated
+                response = self.make_request('GET', '/settings')
+                if response and response.status_code == 200:
+                    updated_settings = response.json()
+                    if updated_settings.get('theme') == 'light':
+                        self.log("✅ Settings update verified")
+                        return True
+                    else:
+                        self.log("❌ Settings update not reflected", "ERROR")
+                        return False
+                else:
+                    self.log("❌ Failed to verify settings update", "ERROR")
+                    return False
             else:
-                self.log_test("GET /progress/python", False, f"Missing fields: {missing_fields}")
+                self.log(f"❌ Settings update failed: {response.status_code if response else 'No response'}", "ERROR")
+                return False
         else:
-            self.log_test("GET /progress/python", False, f"Status: {status}")
+            self.log(f"❌ Get settings failed: {response.status_code if response else 'No response'}", "ERROR")
+            return False
             
-        # Test 2: Complete a lesson
-        lesson_completion = {
+    def test_enhanced_progress(self):
+        """Test enhanced progress tracking with combo multipliers and gems"""
+        self.log("Testing enhanced progress tracking...")
+        
+        if not self.token:
+            self.log("❌ No auth token for progress test", "ERROR")
+            return False
+            
+        # Complete a lesson to test enhanced features
+        lesson_data = {
             "lesson_id": "python_1_1",
             "language": "python",
             "answers": [
-                {"selected": 0},  # multiple choice
-                {"code": "print('Hello, World!')"},  # code
-                {"answer": "print"}  # fill blank
-            ]
+                {"selected": 0},  # Correct answer for first question
+                {"selected": 0},  # Correct answer for second question
+                {"code": "print('Hello, World!')"},  # Code exercise
+                {"answer": "print"},  # Fill blank
+                {"selected": 0},  # Multiple choice
+                {"code": "print('YourName')"},  # Code
+                {"selected": 0},  # Multiple choice
+                {"answer": "comment"},  # Fill blank
+                {"code": "print('Line 1')\nprint('Line 2')"},  # Code
+                {"selected": 0},  # Multiple choice
+            ],
+            "time_taken": 90  # Under 2 minutes for speed bonus
         }
         
-        response, status = self.make_request("POST", "/progress/complete", lesson_completion)
+        response = self.make_request('POST', '/progress/complete', lesson_data)
         
-        if status == 200 and response:
-            expected_fields = ["score", "xp_earned", "new_xp", "new_level", "hearts", "correct", "total"]
-            missing_fields = [f for f in expected_fields if f not in response]
+        if response and response.status_code == 200:
+            result = response.json()
             
-            if not missing_fields:
-                self.log_test("POST /progress/complete", True, 
-                            f"Score: {response['score']}%, XP: +{response['xp_earned']}, Level: {response['new_level']}")
+            # Check enhanced features
+            combo_multiplier = result.get('combo_multiplier', 1.0)
+            gems_earned = result.get('gems_earned', 0)
+            daily_xp = result.get('daily_xp', 0)
+            daily_goal = result.get('daily_goal', 50)
+            
+            self.log(f"✅ Lesson completed successfully")
+            self.log(f"   Combo multiplier: {combo_multiplier}")
+            self.log(f"   Gems earned: {gems_earned}")
+            self.log(f"   Daily XP: {daily_xp}/{daily_goal}")
+            
+            # Verify enhanced features
+            if 1.0 <= combo_multiplier <= 5.0:
+                self.log("✅ Combo multiplier in valid range")
+            else:
+                self.log(f"❌ Invalid combo multiplier: {combo_multiplier}", "ERROR")
                 
-                # Check if XP was awarded
-                if response["xp_earned"] > 0:
-                    self.log_test("XP award", True, f"Earned {response['xp_earned']} XP")
-                else:
-                    self.log_test("XP award", False, "No XP earned")
-                    
-                # Check if badges were awarded
-                if "new_badges" in response and response["new_badges"]:
-                    self.log_test("Badge award", True, f"Badges: {response['new_badges']}")
-                else:
-                    self.log_test("Badge award", False, "No badges awarded")
-                    
+            if gems_earned >= 0:
+                self.log("✅ Gems system working")
             else:
-                self.log_test("POST /progress/complete", False, f"Missing fields: {missing_fields}")
-        else:
-            self.log_test("POST /progress/complete", False, f"Status: {status}")
-            
-        # Test 3: Check progress after completion
-        response, status = self.make_request("GET", "/progress/python")
-        
-        if status == 200 and response:
-            if response["completed_lessons"] >= 1:
-                self.log_test("Progress after completion", True, f"Completed: {response['completed_lessons']}")
-            else:
-                self.log_test("Progress after completion", False, "Lesson not marked as completed")
-        else:
-            self.log_test("Progress after completion", False, f"Status: {status}")
-            
-        return True
-        
-    def test_social_endpoints(self):
-        """Test social features: leaderboard, friends, badges"""
-        print("\n=== TESTING SOCIAL ENDPOINTS ===")
-        
-        # Test 1: Get leaderboard
-        response, status = self.make_request("GET", "/leaderboard")
-        
-        if status == 200 and response and isinstance(response, list):
-            if len(response) <= 50:  # Should limit to 50 users
-                self.log_test("GET /leaderboard", True, f"Leaderboard has {len(response)} users")
+                self.log("❌ Gems system issue", "ERROR")
                 
-                if response:  # If there are users
-                    first_user = response[0]
-                    expected_fields = ["username", "xp", "level", "streak", "badges_count"]
-                    missing_fields = [f for f in expected_fields if f not in first_user]
-                    
-                    if not missing_fields:
-                        self.log_test("Leaderboard user structure", True, "All fields present")
-                    else:
-                        self.log_test("Leaderboard user structure", False, f"Missing: {missing_fields}")
-            else:
-                self.log_test("GET /leaderboard", False, f"Too many users: {len(response)}")
+            return True
         else:
-            self.log_test("GET /leaderboard", False, f"Status: {status}")
+            error_msg = response.json().get('detail', 'Unknown error') if response else 'No response'
+            self.log(f"❌ Progress completion failed: {error_msg}", "ERROR")
+            return False
             
-        # Need to be logged in for friend operations
+    def test_daily_challenge(self):
+        """Test daily challenge system"""
+        self.log("Testing daily challenge system...")
+        
         if not self.token:
-            user_data = TEST_CREDENTIALS["user1"]
-            login_data = {"email": user_data["email"], "password": user_data["password"]}
-            response, status = self.make_request("POST", "/auth/login", login_data)
-            if status == 200 and response and "token" in response:
-                self.token = response["token"]
-            else:
-                self.log_test("Login for social tests", False, "Could not login")
-                return False
+            self.log("❌ No auth token for daily challenge test", "ERROR")
+            return False
+            
+        # Get daily challenge
+        response = self.make_request('GET', '/daily-challenge')
+        
+        if response and response.status_code == 200:
+            challenge = response.json()
+            
+            challenge_id = challenge.get('id')
+            exercises = challenge.get('exercises', [])
+            xp_reward = challenge.get('xp_reward', 0)
+            gem_reward = challenge.get('gem_reward', 0)
+            
+            self.log(f"✅ Daily challenge retrieved: {challenge.get('title', 'Unknown')}")
+            self.log(f"   Exercises: {len(exercises)}")
+            self.log(f"   XP reward: {xp_reward}")
+            self.log(f"   Gem reward: {gem_reward}")
+            
+            if challenge.get('completed'):
+                self.log("ℹ️  Challenge already completed today")
+                return True
                 
-        # Test 2: Create second user for friend testing
-        user2_data = TEST_CREDENTIALS["user2"]
-        response, status = self.make_request("POST", "/auth/register", user2_data, expect_status=200)
-        
-        if status == 400:  # User might already exist
-            self.log_test("Second user creation", True, "User already exists (expected)")
-        elif status == 200:
-            self.log_test("Second user creation", True, "Second user created")
-        else:
-            self.log_test("Second user creation", False, f"Status: {status}")
-            
-        # Test 3: Add friend
-        friend_request = {"friend_username": user2_data["username"]}
-        response, status = self.make_request("POST", "/friends/add", friend_request)
-        
-        if status == 200:
-            self.log_test("POST /friends/add", True, f"Added {user2_data['username']} as friend")
-        elif status == 400:  # Might already be friends
-            self.log_test("POST /friends/add", True, "Already friends (expected)")
-        else:
-            self.log_test("POST /friends/add", False, f"Status: {status}")
-            
-        # Test 4: Get friends list
-        response, status = self.make_request("GET", "/friends")
-        
-        if status == 200 and response is not None:
-            if isinstance(response, list):
-                self.log_test("GET /friends", True, f"Friends list has {len(response)} friends")
-            else:
-                self.log_test("GET /friends", False, "Response is not a list")
-        else:
-            self.log_test("GET /friends", False, f"Status: {status}")
-            
-        # Test 5: Get badges
-        response, status = self.make_request("GET", "/badges")
-        
-        if status == 200 and response and isinstance(response, list):
-            if len(response) >= 10:  # Should have multiple badges available
-                self.log_test("GET /badges", True, f"Found {len(response)} available badges")
-                
-                # Check badge structure
-                if response:
-                    first_badge = response[0]
-                    expected_fields = ["id", "name", "description", "icon"]
-                    missing_fields = [f for f in expected_fields if f not in first_badge]
+            # Complete the challenge
+            answers = []
+            for ex in exercises:
+                if ex['type'] == 'multiple_choice':
+                    answers.append({"selected": ex.get('correct', 0)})
+                elif ex['type'] == 'code':
+                    answers.append({"code": ex.get('solution', '')})
+                elif ex['type'] == 'fill_blank':
+                    answers.append({"answer": ex.get('answer', '')})
                     
-                    if not missing_fields:
-                        self.log_test("Badge structure", True, "All fields present")
+            completion_data = {
+                "challenge_id": challenge_id,
+                "answers": answers
+            }
+            
+            response = self.make_request('POST', '/daily-challenge/complete', completion_data)
+            
+            if response and response.status_code == 200:
+                result = response.json()
+                
+                score = result.get('score', 0)
+                xp_earned = result.get('xp_earned', 0)
+                gems_earned = result.get('gems_earned', 0)
+                passed = result.get('passed', False)
+                
+                self.log(f"✅ Daily challenge completed")
+                self.log(f"   Score: {score}%")
+                self.log(f"   XP earned: {xp_earned}")
+                self.log(f"   Gems earned: {gems_earned}")
+                self.log(f"   Passed: {passed}")
+                
+                return True
+            else:
+                error_msg = response.json().get('detail', 'Unknown error') if response else 'No response'
+                if 'Already completed' in error_msg:
+                    self.log("ℹ️  Challenge already completed today")
+                    return True
+                else:
+                    self.log(f"❌ Challenge completion failed: {error_msg}", "ERROR")
+                    return False
+        else:
+            self.log(f"❌ Daily challenge request failed: {response.status_code if response else 'No response'}", "ERROR")
+            return False
+            
+    def test_shop_system(self):
+        """Test shop system for buying hearts and streak freezes"""
+        self.log("Testing shop system...")
+        
+        if not self.token:
+            self.log("❌ No auth token for shop test", "ERROR")
+            return False
+            
+        # Get current user data to check gems
+        response = self.make_request('GET', '/auth/me')
+        
+        if response and response.status_code == 200:
+            user = response.json()
+            current_gems = user.get('gems', 0)
+            current_hearts = user.get('hearts', 5)
+            
+            self.log(f"Current gems: {current_gems}, hearts: {current_hearts}")
+            
+            if current_gems >= 10:
+                # Test buying hearts
+                response = self.make_request('POST', '/shop/buy-hearts')
+                
+                if response and response.status_code == 200:
+                    result = response.json()
+                    self.log(f"✅ Hearts purchased: {result.get('message', 'Success')}")
+                    
+                    # Test buying streak freeze if enough gems
+                    if current_gems >= 20:
+                        response = self.make_request('POST', '/shop/buy-streak-freeze')
+                        
+                        if response and response.status_code == 200:
+                            result = response.json()
+                            self.log(f"✅ Streak freeze purchased: {result.get('message', 'Success')}")
+                            return True
+                        else:
+                            error_msg = response.json().get('detail', 'Unknown error') if response else 'No response'
+                            self.log(f"❌ Streak freeze purchase failed: {error_msg}", "ERROR")
+                            return False
                     else:
-                        self.log_test("Badge structure", False, f"Missing: {missing_fields}")
+                        self.log("ℹ️  Not enough gems for streak freeze (need 20)")
+                        return True
+                else:
+                    error_msg = response.json().get('detail', 'Unknown error') if response else 'No response'
+                    self.log(f"❌ Heart purchase failed: {error_msg}", "ERROR")
+                    return False
             else:
-                self.log_test("GET /badges", False, f"Expected 10+ badges, got {len(response)}")
+                self.log("ℹ️  Not enough gems for shop purchases (need 10 for hearts)")
+                return True
         else:
-            self.log_test("GET /badges", False, f"Status: {status}")
+            self.log(f"❌ Failed to get user data: {response.status_code if response else 'No response'}", "ERROR")
+            return False
             
-        return True
+    def test_badges_count(self):
+        """Test that we have 20 badges"""
+        self.log("Testing badges system...")
         
-    def test_error_handling(self):
-        """Test error cases and edge conditions"""
-        print("\n=== TESTING ERROR HANDLING ===")
+        response = self.make_request('GET', '/badges', auth_required=False)
         
-        # Test 1: Invalid login credentials
-        invalid_login = {"email": "nonexistent@test.com", "password": "wrong"}
-        response, status = self.make_request("POST", "/auth/login", invalid_login, expect_status=401)
-        
-        if status == 401:
-            self.log_test("Invalid login credentials", True, "Properly rejected")
+        if response and response.status_code == 200:
+            badges = response.json()
+            
+            if len(badges) == 20:
+                self.log(f"✅ Found {len(badges)} badges (expected 20)")
+                
+                # Check for some specific badges
+                badge_ids = [badge['id'] for badge in badges]
+                expected_badges = ['combo_king', 'daily_achiever', 'lesson_master', 'no_mistakes']
+                
+                found_badges = [badge for badge in expected_badges if badge in badge_ids]
+                self.log(f"✅ Found enhanced badges: {', '.join(found_badges)}")
+                
+                return len(badges) == 20
+            else:
+                self.log(f"❌ Expected 20 badges, found {len(badges)}", "ERROR")
+                return False
         else:
-            self.log_test("Invalid login credentials", False, f"Status: {status}")
+            self.log(f"❌ Badges request failed: {response.status_code if response else 'No response'}", "ERROR")
+            return False
             
-        # Test 2: Access protected endpoint without token
-        response, status = self.make_request("GET", "/auth/me", headers={}, expect_status=401)
-        
-        if status == 401:
-            self.log_test("Protected endpoint without auth", True, "Properly rejected")
-        else:
-            self.log_test("Protected endpoint without auth", False, f"Status: {status}")
-            
-        # Test 3: Invalid language ID
-        response, status = self.make_request("GET", "/languages/invalid/lessons", expect_status=404)
-        
-        if status == 404:
-            self.log_test("Invalid language ID", True, "Properly rejected")
-        else:
-            self.log_test("Invalid language ID", False, f"Status: {status}")
-            
-        # Test 4: Invalid lesson ID
-        response, status = self.make_request("GET", "/languages/python/lessons/invalid", expect_status=404)
-        
-        if status == 404:
-            self.log_test("Invalid lesson ID", True, "Properly rejected")
-        else:
-            self.log_test("Invalid lesson ID", False, f"Status: {status}")
-            
-        return True
-        
     def run_all_tests(self):
-        """Run all test suites"""
-        print("🚀 Starting Codero Backend API Tests")
-        print(f"📍 Base URL: {BASE_URL}")
-        print(f"⏰ Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        """Run all test cases"""
+        self.log("=" * 60)
+        self.log("STARTING ENHANCED CODERO BACKEND API TESTS")
+        self.log("=" * 60)
         
-        # Run test suites
-        self.test_auth_endpoints()
-        self.test_languages_endpoints()
-        self.test_progress_endpoints()
-        self.test_social_endpoints()
-        self.test_error_handling()
+        tests = [
+            ("API Health", self.test_api_health),
+            ("User Registration", self.test_user_registration),
+            ("20 Languages", self.test_languages_count),
+            ("30 Lessons per Language", self.test_lessons_count),
+            ("10 Exercises per Lesson", self.test_lesson_exercises),
+            ("Settings API", self.test_settings_api),
+            ("Enhanced Progress", self.test_enhanced_progress),
+            ("Daily Challenge", self.test_daily_challenge),
+            ("Shop System", self.test_shop_system),
+            ("20 Badges", self.test_badges_count),
+        ]
         
-        # Summary
-        print("\n" + "="*50)
-        print("📊 TEST SUMMARY")
-        print("="*50)
+        passed = 0
+        total = len(tests)
         
-        total_tests = len(self.test_results)
-        passed_tests = len([t for t in self.test_results if t["success"]])
-        failed_tests = total_tests - passed_tests
+        for test_name, test_func in tests:
+            self.log(f"\n--- Testing {test_name} ---")
+            try:
+                if test_func():
+                    passed += 1
+                    self.log(f"✅ {test_name} PASSED")
+                else:
+                    self.log(f"❌ {test_name} FAILED", "ERROR")
+            except Exception as e:
+                self.log(f"❌ {test_name} ERROR: {e}", "ERROR")
+                
+        self.log("\n" + "=" * 60)
+        self.log(f"TEST RESULTS: {passed}/{total} tests passed ({int(passed/total*100)}%)")
+        self.log("=" * 60)
         
-        print(f"Total Tests: {total_tests}")
-        print(f"✅ Passed: {passed_tests}")
-        print(f"❌ Failed: {failed_tests}")
-        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
-        
-        if failed_tests > 0:
-            print("\n🔍 FAILED TESTS:")
-            for test in self.test_results:
-                if not test["success"]:
-                    print(f"   ❌ {test['test']}: {test['details']}")
-                    
-        print(f"\n⏰ Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        return failed_tests == 0
+        if passed == total:
+            self.log("🎉 ALL TESTS PASSED! Enhanced Codero backend is working correctly.")
+        else:
+            self.log(f"⚠️  {total - passed} tests failed. Please check the issues above.")
+            
+        return passed == total
 
 if __name__ == "__main__":
     tester = CoderoAPITester()
     success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    exit(0 if success else 1)

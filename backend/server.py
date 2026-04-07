@@ -6,13 +6,15 @@ from starlette.requests import Request
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
 import hashlib
 import secrets
+import random
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -49,9 +51,16 @@ class UserResponse(BaseModel):
     level: int = 1
     streak: int = 0
     hearts: int = 5
+    max_hearts: int = 5
+    gems: int = 0
     last_activity: Optional[str] = None
     badges: List[str] = []
     friends: List[str] = []
+    daily_goal: int = 50
+    daily_xp: int = 0
+    combo_multiplier: float = 1.0
+    total_lessons_completed: int = 0
+    settings: Dict[str, Any] = {}
     created_at: str
 
 class UserProgress(BaseModel):
@@ -66,9 +75,17 @@ class LessonAnswer(BaseModel):
     lesson_id: str
     language: str
     answers: List[dict]
+    time_taken: Optional[int] = None  # seconds
 
 class FriendRequest(BaseModel):
     friend_username: str
+
+class SettingsUpdate(BaseModel):
+    settings: Dict[str, Any]
+
+class DailyChallengeAnswer(BaseModel):
+    challenge_id: str
+    answers: List[dict]
 
 # ============== HELPER FUNCTIONS ==============
 
@@ -88,506 +105,538 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
+# ============== CODE VALIDATION ==============
+
+def validate_code(user_code: str, solution: str, language: str, exercise_type: str = "code") -> tuple:
+    """Enhanced code validation with multiple checks"""
+    user_code = user_code.strip()
+    solution = solution.strip()
+    
+    if not user_code:
+        return False, "No code provided"
+    
+    # Normalize whitespace
+    user_normalized = re.sub(r'\s+', ' ', user_code.lower())
+    solution_normalized = re.sub(r'\s+', ' ', solution.lower())
+    
+    # Extract key patterns based on language
+    patterns_to_check = []
+    
+    if language == "python":
+        # Check for key Python constructs
+        if "print" in solution.lower():
+            patterns_to_check.append(r'print\s*\(')
+        if "def " in solution.lower():
+            patterns_to_check.append(r'def\s+\w+\s*\(')
+        if "class " in solution.lower():
+            patterns_to_check.append(r'class\s+\w+')
+        if "for " in solution.lower():
+            patterns_to_check.append(r'for\s+\w+\s+in\s+')
+        if "while " in solution.lower():
+            patterns_to_check.append(r'while\s+')
+        if "if " in solution.lower():
+            patterns_to_check.append(r'if\s+')
+        if "return " in solution.lower():
+            patterns_to_check.append(r'return\s+')
+        if "import " in solution.lower():
+            patterns_to_check.append(r'import\s+')
+        if "lambda" in solution.lower():
+            patterns_to_check.append(r'lambda\s+')
+            
+    elif language in ["javascript", "typescript"]:
+        if "console.log" in solution.lower():
+            patterns_to_check.append(r'console\.log\s*\(')
+        if "function" in solution.lower():
+            patterns_to_check.append(r'function\s+\w*\s*\(')
+        if "const " in solution.lower() or "let " in solution.lower():
+            patterns_to_check.append(r'(const|let|var)\s+\w+')
+        if "=>" in solution:
+            patterns_to_check.append(r'=>')
+        if "async" in solution.lower():
+            patterns_to_check.append(r'async\s+')
+        if "await" in solution.lower():
+            patterns_to_check.append(r'await\s+')
+            
+    elif language in ["java", "kotlin", "csharp"]:
+        if "System.out" in solution:
+            patterns_to_check.append(r'System\.out\.print')
+        if "public " in solution.lower():
+            patterns_to_check.append(r'public\s+')
+        if "class " in solution.lower():
+            patterns_to_check.append(r'class\s+\w+')
+        if "void " in solution.lower():
+            patterns_to_check.append(r'void\s+\w+')
+            
+    elif language in ["cpp", "c"]:
+        if "cout" in solution.lower():
+            patterns_to_check.append(r'cout\s*<<')
+        if "printf" in solution.lower():
+            patterns_to_check.append(r'printf\s*\(')
+        if "#include" in solution.lower():
+            patterns_to_check.append(r'#include\s*[<"]')
+            
+    elif language == "shell":
+        if "echo" in solution.lower():
+            patterns_to_check.append(r'echo\s+')
+        if "if " in solution.lower():
+            patterns_to_check.append(r'if\s+\[')
+        if "for " in solution.lower():
+            patterns_to_check.append(r'for\s+\w+\s+in')
+            
+    elif language == "rust":
+        if "println!" in solution:
+            patterns_to_check.append(r'println!\s*\(')
+        if "fn " in solution.lower():
+            patterns_to_check.append(r'fn\s+\w+')
+        if "let " in solution.lower():
+            patterns_to_check.append(r'let\s+(mut\s+)?\w+')
+            
+    elif language == "go":
+        if "fmt.Print" in solution:
+            patterns_to_check.append(r'fmt\.Print')
+        if "func " in solution.lower():
+            patterns_to_check.append(r'func\s+\w*')
+            
+    elif language == "elixir":
+        if "IO.puts" in solution:
+            patterns_to_check.append(r'IO\.puts')
+        if "def " in solution.lower():
+            patterns_to_check.append(r'def\s+\w+')
+        if "defmodule" in solution.lower():
+            patterns_to_check.append(r'defmodule\s+\w+')
+            
+    elif language == "zig":
+        if "std.debug.print" in solution:
+            patterns_to_check.append(r'std\.debug\.print')
+        if "fn " in solution.lower():
+            patterns_to_check.append(r'fn\s+\w+')
+    
+    # Check patterns
+    patterns_matched = 0
+    for pattern in patterns_to_check:
+        if re.search(pattern, user_code, re.IGNORECASE):
+            patterns_matched += 1
+    
+    # Calculate score
+    if not patterns_to_check:
+        # Fallback: simple similarity check
+        if user_normalized == solution_normalized:
+            return True, "Perfect match!"
+        elif solution_normalized in user_normalized or user_normalized in solution_normalized:
+            return True, "Good solution!"
+        elif len(user_code) >= len(solution) * 0.5:
+            return True, "Code accepted"
+        return False, "Code doesn't match expected solution"
+    
+    match_ratio = patterns_matched / len(patterns_to_check) if patterns_to_check else 0
+    
+    if match_ratio >= 0.7:
+        return True, "Great code!"
+    elif match_ratio >= 0.5:
+        return True, "Good attempt!"
+    elif match_ratio >= 0.3:
+        return True, "Partial solution accepted"
+    
+    return False, "Code doesn't include required elements"
+
 # ============== PROGRAMMING LANGUAGES DATA ==============
 
 LANGUAGES = [
-    {"id": "python", "name": "Python", "icon": "logo-python", "color": "#3776AB", "description": "Great for beginners and AI"},
-    {"id": "javascript", "name": "JavaScript", "icon": "logo-javascript", "color": "#F7DF1E", "description": "The language of the web"},
-    {"id": "java", "name": "Java", "icon": "cafe", "color": "#ED8B00", "description": "Enterprise & Android apps"},
-    {"id": "cpp", "name": "C++", "icon": "code-slash", "color": "#00599C", "description": "Performance & game dev"},
-    {"id": "csharp", "name": "C#", "icon": "game-controller", "color": "#239120", "description": "Unity & Windows apps"},
-    {"id": "ruby", "name": "Ruby", "icon": "diamond", "color": "#CC342D", "description": "Elegant web development"},
-    {"id": "go", "name": "Go", "icon": "rocket", "color": "#00ADD8", "description": "Fast & concurrent"},
-    {"id": "rust", "name": "Rust", "icon": "shield-checkmark", "color": "#DEA584", "description": "Safe systems programming"},
-    {"id": "swift", "name": "Swift", "icon": "logo-apple", "color": "#FA7343", "description": "iOS & macOS apps"},
-    {"id": "kotlin", "name": "Kotlin", "icon": "logo-android", "color": "#7F52FF", "description": "Modern Android dev"},
-    {"id": "typescript", "name": "TypeScript", "icon": "code-working", "color": "#3178C6", "description": "Typed JavaScript"},
-    {"id": "php", "name": "PHP", "icon": "server", "color": "#777BB4", "description": "Web server scripting"},
-    {"id": "sql", "name": "SQL", "icon": "file-tray-stacked", "color": "#4479A1", "description": "Database queries"},
-    {"id": "html_css", "name": "HTML/CSS", "icon": "globe", "color": "#E34F26", "description": "Web page structure"},
-    {"id": "skript", "name": "Skript", "icon": "cube", "color": "#6B8E23", "description": "Minecraft scripting"},
-    {"id": "lua", "name": "Lua", "icon": "moon", "color": "#000080", "description": "Game scripting & Roblox"},
+    {"id": "python", "name": "Python", "icon": "logo-python", "color": "#3776AB", "description": "Great for beginners and AI", "difficulty": "beginner"},
+    {"id": "javascript", "name": "JavaScript", "icon": "logo-javascript", "color": "#F7DF1E", "description": "The language of the web", "difficulty": "beginner"},
+    {"id": "java", "name": "Java", "icon": "cafe", "color": "#ED8B00", "description": "Enterprise & Android apps", "difficulty": "intermediate"},
+    {"id": "cpp", "name": "C++", "icon": "code-slash", "color": "#00599C", "description": "Performance & game dev", "difficulty": "advanced"},
+    {"id": "csharp", "name": "C#", "icon": "game-controller", "color": "#239120", "description": "Unity & Windows apps", "difficulty": "intermediate"},
+    {"id": "ruby", "name": "Ruby", "icon": "diamond", "color": "#CC342D", "description": "Elegant web development", "difficulty": "beginner"},
+    {"id": "go", "name": "Go", "icon": "rocket", "color": "#00ADD8", "description": "Fast & concurrent", "difficulty": "intermediate"},
+    {"id": "rust", "name": "Rust", "icon": "shield-checkmark", "color": "#DEA584", "description": "Safe systems programming", "difficulty": "advanced"},
+    {"id": "swift", "name": "Swift", "icon": "logo-apple", "color": "#FA7343", "description": "iOS & macOS apps", "difficulty": "intermediate"},
+    {"id": "kotlin", "name": "Kotlin", "icon": "logo-android", "color": "#7F52FF", "description": "Modern Android dev", "difficulty": "intermediate"},
+    {"id": "typescript", "name": "TypeScript", "icon": "code-working", "color": "#3178C6", "description": "Typed JavaScript", "difficulty": "intermediate"},
+    {"id": "php", "name": "PHP", "icon": "server", "color": "#777BB4", "description": "Web server scripting", "difficulty": "beginner"},
+    {"id": "sql", "name": "SQL", "icon": "file-tray-stacked", "color": "#4479A1", "description": "Database queries", "difficulty": "beginner"},
+    {"id": "html_css", "name": "HTML/CSS", "icon": "globe", "color": "#E34F26", "description": "Web page structure", "difficulty": "beginner"},
+    {"id": "skript", "name": "Skript", "icon": "cube", "color": "#6B8E23", "description": "Minecraft scripting", "difficulty": "beginner"},
+    {"id": "lua", "name": "Lua", "icon": "moon", "color": "#000080", "description": "Game scripting & Roblox", "difficulty": "beginner"},
+    # New languages
+    {"id": "zig", "name": "Zig", "icon": "flash", "color": "#F7A41D", "description": "Modern systems language", "difficulty": "advanced"},
+    {"id": "elixir", "name": "Elixir", "icon": "water", "color": "#4B275F", "description": "Functional & concurrent", "difficulty": "intermediate"},
+    {"id": "shell", "name": "Shell", "icon": "terminal", "color": "#4EAA25", "description": "Bash & command line", "difficulty": "beginner"},
+    {"id": "haskell", "name": "Haskell", "icon": "analytics", "color": "#5D4F85", "description": "Pure functional", "difficulty": "advanced"},
 ]
-
-# ============== LESSON DATA (TONS OF LESSONS) ==============
-
-def generate_lessons(language_id: str) -> List[dict]:
-    """Generate comprehensive lessons for each language"""
-    
-    # Base lesson templates that adapt per language
-    lesson_templates = {
-        "python": {
-            "basics": [
-                {"id": f"{language_id}_1_1", "title": "Hello World", "description": "Print your first message", "xp": 10, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What function prints output in Python?", "options": ["print()", "echo()", "console.log()", "System.out"], "correct": 0},
-                     {"type": "code", "question": "Write code to print 'Hello, World!'", "starter": "", "solution": "print('Hello, World!')", "hint": "Use the print() function"},
-                     {"type": "fill_blank", "question": "Complete: ___('Hello')", "answer": "print"},
-                 ]},
-                {"id": f"{language_id}_1_2", "title": "Variables", "description": "Store data in variables", "xp": 15, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "How do you create a variable in Python?", "options": ["name = 'John'", "var name = 'John'", "let name = 'John'", "String name = 'John'"], "correct": 0},
-                     {"type": "code", "question": "Create a variable called 'age' with value 25", "starter": "", "solution": "age = 25", "hint": "variable_name = value"},
-                     {"type": "multiple_choice", "question": "What type is the variable: x = 3.14?", "options": ["int", "float", "str", "bool"], "correct": 1},
-                 ]},
-                {"id": f"{language_id}_1_3", "title": "Data Types", "description": "Learn about strings, integers, floats", "xp": 15, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Which is a string?", "options": ["42", "'Hello'", "3.14", "True"], "correct": 1},
-                     {"type": "code", "question": "Create a boolean variable 'is_active' set to True", "starter": "", "solution": "is_active = True", "hint": "Boolean values are True or False"},
-                     {"type": "fill_blank", "question": "Convert '42' to int: int(___)", "answer": "'42'"},
-                 ]},
-                {"id": f"{language_id}_1_4", "title": "String Operations", "description": "Manipulate text data", "xp": 20, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "How to get string length?", "options": ["len(s)", "s.length", "s.size()", "length(s)"], "correct": 0},
-                     {"type": "code", "question": "Concatenate 'Hello' and 'World' with a space", "starter": "", "solution": "'Hello' + ' ' + 'World'", "hint": "Use + to join strings"},
-                     {"type": "multiple_choice", "question": "What is 'Python'[0]?", "options": ["P", "y", "Python", "Error"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_1_5", "title": "Numbers & Math", "description": "Arithmetic operations", "xp": 20, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What is 7 // 2 in Python?", "options": ["3.5", "3", "4", "2"], "correct": 1},
-                     {"type": "code", "question": "Calculate 2 to the power of 8", "starter": "", "solution": "2 ** 8", "hint": "Use ** for exponentiation"},
-                     {"type": "fill_blank", "question": "Modulo operator: 10 ___ 3 = 1", "answer": "%"},
-                 ]},
-            ],
-            "control_flow": [
-                {"id": f"{language_id}_2_1", "title": "If Statements", "description": "Make decisions in code", "xp": 25, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What keyword starts a conditional?", "options": ["if", "when", "case", "check"], "correct": 0},
-                     {"type": "code", "question": "Write an if statement that prints 'Adult' if age >= 18", "starter": "age = 20\n", "solution": "age = 20\nif age >= 18:\n    print('Adult')", "hint": "Remember the colon and indentation"},
-                     {"type": "fill_blank", "question": "if x > 5___", "answer": ":"},
-                 ]},
-                {"id": f"{language_id}_2_2", "title": "Else & Elif", "description": "Handle multiple conditions", "xp": 25, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What is elif short for?", "options": ["else if", "elif if", "else elif", "end if"], "correct": 0},
-                     {"type": "code", "question": "Add else clause to print 'Minor' if age < 18", "starter": "age = 15\nif age >= 18:\n    print('Adult')\n", "solution": "age = 15\nif age >= 18:\n    print('Adult')\nelse:\n    print('Minor')", "hint": "else doesn't need a condition"},
-                     {"type": "multiple_choice", "question": "How many elif can you have?", "options": ["1", "2", "Unlimited", "0"], "correct": 2},
-                 ]},
-                {"id": f"{language_id}_2_3", "title": "For Loops", "description": "Repeat with for", "xp": 30, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What does range(5) produce?", "options": ["0,1,2,3,4", "1,2,3,4,5", "0,1,2,3,4,5", "1,2,3,4"], "correct": 0},
-                     {"type": "code", "question": "Print numbers 1 to 5 using a for loop", "starter": "", "solution": "for i in range(1, 6):\n    print(i)", "hint": "range(start, end) - end is exclusive"},
-                     {"type": "fill_blank", "question": "for item ___ my_list:", "answer": "in"},
-                 ]},
-                {"id": f"{language_id}_2_4", "title": "While Loops", "description": "Repeat while condition true", "xp": 30, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "When does a while loop stop?", "options": ["When condition is False", "After 10 iterations", "Never", "When break is called"], "correct": 0},
-                     {"type": "code", "question": "Count down from 5 to 1 using while", "starter": "count = 5\n", "solution": "count = 5\nwhile count > 0:\n    print(count)\n    count -= 1", "hint": "Don't forget to decrement!"},
-                     {"type": "fill_blank", "question": "___ x > 0:", "answer": "while"},
-                 ]},
-                {"id": f"{language_id}_2_5", "title": "Break & Continue", "description": "Control loop flow", "xp": 25, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What does break do?", "options": ["Exit the loop", "Skip iteration", "Pause loop", "Restart loop"], "correct": 0},
-                     {"type": "code", "question": "Exit loop when i equals 3", "starter": "for i in range(10):\n    ", "solution": "for i in range(10):\n    if i == 3:\n        break\n    print(i)", "hint": "Use break inside an if"},
-                     {"type": "multiple_choice", "question": "What does continue do?", "options": ["Exit loop", "Skip to next iteration", "Stop program", "Print value"], "correct": 1},
-                 ]},
-            ],
-            "functions": [
-                {"id": f"{language_id}_3_1", "title": "Defining Functions", "description": "Create reusable code blocks", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Which keyword defines a function?", "options": ["def", "function", "func", "define"], "correct": 0},
-                     {"type": "code", "question": "Create a function greet() that prints 'Hello!'", "starter": "", "solution": "def greet():\n    print('Hello!')", "hint": "def function_name():"},
-                     {"type": "fill_blank", "question": "___ my_function():", "answer": "def"},
-                 ]},
-                {"id": f"{language_id}_3_2", "title": "Parameters", "description": "Pass data to functions", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What are parameters?", "options": ["Inputs to functions", "Return values", "Variables", "Loops"], "correct": 0},
-                     {"type": "code", "question": "Create add(a, b) that returns a + b", "starter": "", "solution": "def add(a, b):\n    return a + b", "hint": "Use return to give back a value"},
-                     {"type": "multiple_choice", "question": "Default param syntax?", "options": ["def f(x=5)", "def f(x:5)", "def f(x->5)", "def f(5=x)"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_3_3", "title": "Return Values", "description": "Get results from functions", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What if no return statement?", "options": ["Returns None", "Error", "Returns 0", "Infinite loop"], "correct": 0},
-                     {"type": "code", "question": "Create square(n) returning n squared", "starter": "", "solution": "def square(n):\n    return n ** 2", "hint": "n squared is n ** 2"},
-                     {"type": "fill_blank", "question": "def double(x):\n    ___ x * 2", "answer": "return"},
-                 ]},
-                {"id": f"{language_id}_3_4", "title": "Lambda Functions", "description": "Quick anonymous functions", "xp": 40, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Lambda syntax?", "options": ["lambda x: x*2", "-> x: x*2", "func x: x*2", "(x) => x*2"], "correct": 0},
-                     {"type": "code", "question": "Create a lambda that adds 10 to x", "starter": "", "solution": "add_ten = lambda x: x + 10", "hint": "lambda parameter: expression"},
-                     {"type": "multiple_choice", "question": "Lambdas are also called?", "options": ["Anonymous functions", "Named functions", "Loops", "Classes"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_3_5", "title": "Scope", "description": "Variable visibility", "xp": 40, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What is local scope?", "options": ["Inside function", "Everywhere", "In class only", "In module"], "correct": 0},
-                     {"type": "code", "question": "Use global keyword to modify x inside function", "starter": "x = 10\ndef change():\n    ", "solution": "x = 10\ndef change():\n    global x\n    x = 20", "hint": "global variable_name"},
-                     {"type": "fill_blank", "question": "___ x  # to use global x in function", "answer": "global"},
-                 ]},
-            ],
-            "data_structures": [
-                {"id": f"{language_id}_4_1", "title": "Lists", "description": "Ordered collections", "xp": 30, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "How to create an empty list?", "options": ["[]", "{}", "()", "list{}"], "correct": 0},
-                     {"type": "code", "question": "Create a list with 1, 2, 3 and append 4", "starter": "", "solution": "nums = [1, 2, 3]\nnums.append(4)", "hint": "Use .append() method"},
-                     {"type": "fill_blank", "question": "my_list.___(5)  # add 5", "answer": "append"},
-                 ]},
-                {"id": f"{language_id}_4_2", "title": "List Methods", "description": "Manipulate lists", "xp": 35, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Remove last item?", "options": [".pop()", ".remove()", ".delete()", ".drop()"], "correct": 0},
-                     {"type": "code", "question": "Sort list [3,1,2] in ascending order", "starter": "nums = [3, 1, 2]\n", "solution": "nums = [3, 1, 2]\nnums.sort()", "hint": ".sort() modifies in place"},
-                     {"type": "multiple_choice", "question": "Insert at index 0?", "options": [".insert(0, x)", ".add(0, x)", ".put(0, x)", ".push(0, x)"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_4_3", "title": "Dictionaries", "description": "Key-value pairs", "xp": 35, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Dict syntax?", "options": ["{'key': 'value'}", "['key': 'value']", "('key': 'value')", "{key = value}"], "correct": 0},
-                     {"type": "code", "question": "Create a dict with name='John' and age=30", "starter": "", "solution": "person = {'name': 'John', 'age': 30}", "hint": "Use curly braces and colons"},
-                     {"type": "fill_blank", "question": "Get all keys: dict.___()", "answer": "keys"},
-                 ]},
-                {"id": f"{language_id}_4_4", "title": "Tuples", "description": "Immutable sequences", "xp": 30, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "What makes tuples different from lists?", "options": ["Immutable", "No order", "No duplicates", "Keys required"], "correct": 0},
-                     {"type": "code", "question": "Create a tuple with coordinates (10, 20)", "starter": "", "solution": "coords = (10, 20)", "hint": "Use parentheses"},
-                     {"type": "multiple_choice", "question": "Single element tuple?", "options": ["(5,)", "(5)", "[5]", "{5}"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_4_5", "title": "Sets", "description": "Unique collections", "xp": 30, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Sets allow duplicates?", "options": ["No", "Yes", "Sometimes", "Only strings"], "correct": 0},
-                     {"type": "code", "question": "Create a set from list [1,1,2,2,3]", "starter": "", "solution": "unique = set([1, 1, 2, 2, 3])", "hint": "set() removes duplicates"},
-                     {"type": "fill_blank", "question": "Add to set: my_set.___(5)", "answer": "add"},
-                 ]},
-            ],
-            "oop": [
-                {"id": f"{language_id}_5_1", "title": "Classes Intro", "description": "Create blueprints for objects", "xp": 45, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Keyword to define a class?", "options": ["class", "def", "object", "new"], "correct": 0},
-                     {"type": "code", "question": "Create an empty class called Dog", "starter": "", "solution": "class Dog:\n    pass", "hint": "Use pass for empty body"},
-                     {"type": "fill_blank", "question": "___ MyClass:", "answer": "class"},
-                 ]},
-                {"id": f"{language_id}_5_2", "title": "Constructor", "description": "Initialize objects", "xp": 45, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Constructor method name?", "options": ["__init__", "__new__", "__create__", "__start__"], "correct": 0},
-                     {"type": "code", "question": "Add __init__ with name parameter to Dog class", "starter": "class Dog:\n    ", "solution": "class Dog:\n    def __init__(self, name):\n        self.name = name", "hint": "First param is always self"},
-                     {"type": "fill_blank", "question": "def __init__(___,  name):", "answer": "self"},
-                 ]},
-                {"id": f"{language_id}_5_3", "title": "Methods", "description": "Add behaviors to classes", "xp": 45, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "First param of instance method?", "options": ["self", "this", "me", "instance"], "correct": 0},
-                     {"type": "code", "question": "Add bark() method that prints 'Woof!'", "starter": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    ", "solution": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    def bark(self):\n        print('Woof!')", "hint": "def method_name(self):"},
-                     {"type": "multiple_choice", "question": "Call method on object?", "options": ["obj.method()", "method(obj)", "obj->method()", "obj::method()"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_5_4", "title": "Inheritance", "description": "Extend existing classes", "xp": 50, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Inherit from Animal class?", "options": ["class Dog(Animal):", "class Dog extends Animal:", "class Dog : Animal:", "class Dog inherits Animal:"], "correct": 0},
-                     {"type": "code", "question": "Create Puppy class inheriting from Dog", "starter": "class Dog:\n    def bark(self):\n        print('Woof!')\n\n", "solution": "class Dog:\n    def bark(self):\n        print('Woof!')\n\nclass Puppy(Dog):\n    pass", "hint": "class Child(Parent):"},
-                     {"type": "fill_blank", "question": "Call parent method: super().___", "answer": "__init__"},
-                 ]},
-                {"id": f"{language_id}_5_5", "title": "Encapsulation", "description": "Private attributes", "xp": 50, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Convention for private attr?", "options": ["_name", "private name", "#name", "@name"], "correct": 0},
-                     {"type": "code", "question": "Create private attribute _balance = 0", "starter": "class Account:\n    def __init__(self):\n        ", "solution": "class Account:\n    def __init__(self):\n        self._balance = 0", "hint": "self._attribute_name"},
-                     {"type": "multiple_choice", "question": "Name mangling prefix?", "options": ["__", "_", "@@", "##"], "correct": 0},
-                 ]},
-            ],
-            "advanced": [
-                {"id": f"{language_id}_6_1", "title": "List Comprehension", "description": "Elegant list creation", "xp": 40, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "[x*2 for x in range(5)] produces?", "options": ["[0,2,4,6,8]", "[2,4,6,8,10]", "[0,1,2,3,4]", "[1,2,3,4,5]"], "correct": 0},
-                     {"type": "code", "question": "Create squares of 1-5 using comprehension", "starter": "", "solution": "squares = [x**2 for x in range(1, 6)]", "hint": "[expression for item in iterable]"},
-                     {"type": "fill_blank", "question": "[x for x ___ nums if x > 0]", "answer": "in"},
-                 ]},
-                {"id": f"{language_id}_6_2", "title": "File Handling", "description": "Read and write files", "xp": 45, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Best way to open file?", "options": ["with open()", "open()", "file()", "read()"], "correct": 0},
-                     {"type": "code", "question": "Read entire file content", "starter": "", "solution": "with open('file.txt', 'r') as f:\n    content = f.read()", "hint": "with open() as f:"},
-                     {"type": "fill_blank", "question": "open('file.txt', '___')  # write mode", "answer": "w"},
-                 ]},
-                {"id": f"{language_id}_6_3", "title": "Exception Handling", "description": "Handle errors gracefully", "xp": 45, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Catch all exceptions?", "options": ["except Exception:", "catch Exception:", "error Exception:", "handle Exception:"], "correct": 0},
-                     {"type": "code", "question": "Try to convert 'abc' to int, handle error", "starter": "", "solution": "try:\n    int('abc')\nexcept ValueError:\n    print('Invalid number')", "hint": "try/except block"},
-                     {"type": "fill_blank", "question": "___:\n    risky_code()", "answer": "try"},
-                 ]},
-                {"id": f"{language_id}_6_4", "title": "Decorators", "description": "Modify function behavior", "xp": 55, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Decorator syntax?", "options": ["@decorator", "#decorator", "!decorator", "$decorator"], "correct": 0},
-                     {"type": "code", "question": "Apply @staticmethod to a method", "starter": "class Math:\n    ", "solution": "class Math:\n    @staticmethod\n    def add(a, b):\n        return a + b", "hint": "@decorator above function"},
-                     {"type": "multiple_choice", "question": "Decorators are?", "options": ["Functions wrapping functions", "Classes", "Variables", "Loops"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_6_5", "title": "Generators", "description": "Lazy iterators", "xp": 55, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Generator keyword?", "options": ["yield", "return", "generate", "iterate"], "correct": 0},
-                     {"type": "code", "question": "Create generator counting 1 to 3", "starter": "", "solution": "def count():\n    yield 1\n    yield 2\n    yield 3", "hint": "Use yield instead of return"},
-                     {"type": "fill_blank", "question": "def gen():\n    ___ value", "answer": "yield"},
-                 ]},
-            ],
-        },
-        "javascript": {
-            "basics": [
-                {"id": f"{language_id}_1_1", "title": "Hello World", "description": "Output in JavaScript", "xp": 10, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "How to print to console?", "options": ["console.log()", "print()", "echo()", "System.out"], "correct": 0},
-                     {"type": "code", "question": "Print 'Hello, World!' to console", "starter": "", "solution": "console.log('Hello, World!');", "hint": "Use console.log()"},
-                     {"type": "fill_blank", "question": "console.___('Hi');", "answer": "log"},
-                 ]},
-                {"id": f"{language_id}_1_2", "title": "Variables", "description": "Declare variables", "xp": 15, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Best way to declare variable?", "options": ["let", "var", "const", "variable"], "correct": 0},
-                     {"type": "code", "question": "Create variable name with value 'Alice'", "starter": "", "solution": "let name = 'Alice';", "hint": "let variable = value;"},
-                     {"type": "multiple_choice", "question": "const variables can be changed?", "options": ["No", "Yes", "Sometimes", "Only strings"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_1_3", "title": "Data Types", "description": "Numbers, strings, booleans", "xp": 15, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "typeof 'hello' returns?", "options": ["string", "text", "str", "char"], "correct": 0},
-                     {"type": "code", "question": "Create array with 1, 2, 3", "starter": "", "solution": "let arr = [1, 2, 3];", "hint": "Use square brackets"},
-                     {"type": "fill_blank", "question": "typeof 42 returns '___'", "answer": "number"},
-                 ]},
-                {"id": f"{language_id}_1_4", "title": "Strings", "description": "Text manipulation", "xp": 20, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Template literal syntax?", "options": ["`Hello ${name}`", "'Hello {name}'", "\"Hello #{name}\"", "f'Hello {name}'"], "correct": 0},
-                     {"type": "code", "question": "Join 'Hello' and name using template literal", "starter": "let name = 'World';\n", "solution": "let name = 'World';\nlet greeting = `Hello ${name}`;", "hint": "Use backticks and ${}"},
-                     {"type": "fill_blank", "question": "'hello'.toUpperCase() = '___'", "answer": "HELLO"},
-                 ]},
-                {"id": f"{language_id}_1_5", "title": "Operators", "description": "Math and comparison", "xp": 20, "unit": 1,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Strict equality operator?", "options": ["===", "==", "=", "!="], "correct": 0},
-                     {"type": "code", "question": "Check if 5 strictly equals '5'", "starter": "", "solution": "5 === '5'; // false", "hint": "=== checks type too"},
-                     {"type": "multiple_choice", "question": "10 % 3 equals?", "options": ["1", "3", "3.33", "0"], "correct": 0},
-                 ]},
-            ],
-            "control_flow": [
-                {"id": f"{language_id}_2_1", "title": "If Statements", "description": "Conditional logic", "xp": 25, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "If syntax requires?", "options": ["Parentheses and braces", "Just braces", "Just parentheses", "Colons"], "correct": 0},
-                     {"type": "code", "question": "If age >= 18, log 'Adult'", "starter": "let age = 20;\n", "solution": "let age = 20;\nif (age >= 18) {\n    console.log('Adult');\n}", "hint": "if (condition) { }"},
-                     {"type": "fill_blank", "question": "if (x > 5) ___", "answer": "{"},
-                 ]},
-                {"id": f"{language_id}_2_2", "title": "Else & Ternary", "description": "Alternative paths", "xp": 25, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Ternary operator syntax?", "options": ["a ? b : c", "a : b ? c", "a if b else c", "if a then b else c"], "correct": 0},
-                     {"type": "code", "question": "Use ternary: if x>10 return 'big' else 'small'", "starter": "let x = 15;\n", "solution": "let x = 15;\nlet result = x > 10 ? 'big' : 'small';", "hint": "condition ? true : false"},
-                     {"type": "fill_blank", "question": "x > 5 ___ 'yes' : 'no'", "answer": "?"},
-                 ]},
-                {"id": f"{language_id}_2_3", "title": "For Loops", "description": "Iterate with for", "xp": 30, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "for loop has how many parts?", "options": ["3", "2", "4", "1"], "correct": 0},
-                     {"type": "code", "question": "Print 0 to 4 using for loop", "starter": "", "solution": "for (let i = 0; i < 5; i++) {\n    console.log(i);\n}", "hint": "for (init; condition; update)"},
-                     {"type": "fill_blank", "question": "for (let i=0; i<5; i___)", "answer": "++"},
-                 ]},
-                {"id": f"{language_id}_2_4", "title": "While & Do-While", "description": "Conditional loops", "xp": 30, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "do-while runs at least?", "options": ["Once", "Zero times", "Twice", "Depends"], "correct": 0},
-                     {"type": "code", "question": "While x < 5, log x and increment", "starter": "let x = 0;\n", "solution": "let x = 0;\nwhile (x < 5) {\n    console.log(x);\n    x++;\n}", "hint": "while (condition) { }"},
-                     {"type": "fill_blank", "question": "___ (count > 0) { }", "answer": "while"},
-                 ]},
-                {"id": f"{language_id}_2_5", "title": "Array Iteration", "description": "forEach, map, filter", "xp": 35, "unit": 2,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "map() returns?", "options": ["New array", "Nothing", "Boolean", "Number"], "correct": 0},
-                     {"type": "code", "question": "Double each number in [1,2,3] using map", "starter": "let nums = [1, 2, 3];\n", "solution": "let nums = [1, 2, 3];\nlet doubled = nums.map(x => x * 2);", "hint": "array.map(item => newItem)"},
-                     {"type": "fill_blank", "question": "nums.___(x => x > 2)  // keep > 2", "answer": "filter"},
-                 ]},
-            ],
-            "functions": [
-                {"id": f"{language_id}_3_1", "title": "Function Declaration", "description": "Create functions", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Function keyword?", "options": ["function", "def", "func", "fn"], "correct": 0},
-                     {"type": "code", "question": "Create function greet() that logs 'Hello'", "starter": "", "solution": "function greet() {\n    console.log('Hello');\n}", "hint": "function name() { }"},
-                     {"type": "fill_blank", "question": "___ add(a, b) { return a+b; }", "answer": "function"},
-                 ]},
-                {"id": f"{language_id}_3_2", "title": "Arrow Functions", "description": "Modern function syntax", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Arrow function syntax?", "options": ["() => {}", "-> {}", "=> ()", "function =>"], "correct": 0},
-                     {"type": "code", "question": "Create arrow function square that returns x*x", "starter": "", "solution": "const square = x => x * x;", "hint": "param => expression"},
-                     {"type": "fill_blank", "question": "const add = (a,b) ___ a + b;", "answer": "=>"},
-                 ]},
-                {"id": f"{language_id}_3_3", "title": "Parameters & Defaults", "description": "Function inputs", "xp": 35, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Default parameter syntax?", "options": ["param = value", "param: value", "param -> value", "param == value"], "correct": 0},
-                     {"type": "code", "question": "Create greet(name='Guest') with default", "starter": "", "solution": "function greet(name = 'Guest') {\n    console.log(`Hello ${name}`);\n}", "hint": "function f(param = default)"},
-                     {"type": "fill_blank", "question": "function say(msg ___ 'Hi')", "answer": "="},
-                 ]},
-                {"id": f"{language_id}_3_4", "title": "Callbacks", "description": "Functions as arguments", "xp": 40, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Callback is?", "options": ["Function passed to function", "Return value", "Variable", "Loop"], "correct": 0},
-                     {"type": "code", "question": "Use setTimeout to log 'Done' after 1000ms", "starter": "", "solution": "setTimeout(() => {\n    console.log('Done');\n}, 1000);", "hint": "setTimeout(callback, delay)"},
-                     {"type": "multiple_choice", "question": "Array.forEach takes a?", "options": ["Callback function", "Number", "String", "Boolean"], "correct": 0},
-                 ]},
-                {"id": f"{language_id}_3_5", "title": "Closures", "description": "Functions remembering scope", "xp": 45, "unit": 3,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Closure allows access to?", "options": ["Outer function scope", "Only global scope", "Nothing", "Inner scope only"], "correct": 0},
-                     {"type": "code", "question": "Create counter function using closure", "starter": "", "solution": "function counter() {\n    let count = 0;\n    return () => ++count;\n}", "hint": "Return function that uses outer variable"},
-                     {"type": "fill_blank", "question": "Inner function ___ outer scope", "answer": "remembers"},
-                 ]},
-            ],
-            "objects": [
-                {"id": f"{language_id}_4_1", "title": "Object Basics", "description": "Create objects", "xp": 30, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Object literal syntax?", "options": ["{ key: value }", "[ key: value ]", "( key: value )", "< key: value >"], "correct": 0},
-                     {"type": "code", "question": "Create person object with name and age", "starter": "", "solution": "const person = {\n    name: 'John',\n    age: 30\n};", "hint": "{ property: value }"},
-                     {"type": "fill_blank", "question": "person.name = person___'name'___", "answer": "[,]"},
-                 ]},
-                {"id": f"{language_id}_4_2", "title": "Object Methods", "description": "Functions in objects", "xp": 35, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "'this' refers to?", "options": ["Current object", "Window", "Function", "Class"], "correct": 0},
-                     {"type": "code", "question": "Add greet method that uses this.name", "starter": "const user = {\n    name: 'Alice',\n    ", "solution": "const user = {\n    name: 'Alice',\n    greet() {\n        console.log(`Hi, I'm ${this.name}`);\n    }\n};", "hint": "methodName() { this.property }"},
-                     {"type": "fill_blank", "question": "greet() { return ___.name; }", "answer": "this"},
-                 ]},
-                {"id": f"{language_id}_4_3", "title": "Destructuring", "description": "Extract object properties", "xp": 35, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Destructure name from person?", "options": ["const { name } = person", "const name = person.name", "const [name] = person", "person -> name"], "correct": 0},
-                     {"type": "code", "question": "Destructure x and y from point object", "starter": "const point = { x: 10, y: 20 };\n", "solution": "const point = { x: 10, y: 20 };\nconst { x, y } = point;", "hint": "const { prop1, prop2 } = obj"},
-                     {"type": "fill_blank", "question": "const ___ name, age } = user;", "answer": "{"},
-                 ]},
-                {"id": f"{language_id}_4_4", "title": "Spread & Rest", "description": "... operator", "xp": 40, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Spread operator copies?", "options": ["Array/object elements", "References only", "Nothing", "First element"], "correct": 0},
-                     {"type": "code", "question": "Merge obj1 and obj2 using spread", "starter": "const obj1 = { a: 1 };\nconst obj2 = { b: 2 };\n", "solution": "const obj1 = { a: 1 };\nconst obj2 = { b: 2 };\nconst merged = { ...obj1, ...obj2 };", "hint": "{ ...obj1, ...obj2 }"},
-                     {"type": "fill_blank", "question": "const copy = [___arr];", "answer": "..."},
-                 ]},
-                {"id": f"{language_id}_4_5", "title": "Classes", "description": "ES6 class syntax", "xp": 45, "unit": 4,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Constructor method is called?", "options": ["When object created", "When method called", "Never", "On delete"], "correct": 0},
-                     {"type": "code", "question": "Create Person class with name in constructor", "starter": "", "solution": "class Person {\n    constructor(name) {\n        this.name = name;\n    }\n}", "hint": "class Name { constructor() }"},
-                     {"type": "fill_blank", "question": "class Dog ___ Animal { }", "answer": "extends"},
-                 ]},
-            ],
-            "async": [
-                {"id": f"{language_id}_5_1", "title": "Promises", "description": "Handle async operations", "xp": 45, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Promise states?", "options": ["pending, fulfilled, rejected", "start, success, fail", "waiting, done, error", "begin, end, stop"], "correct": 0},
-                     {"type": "code", "question": "Create promise that resolves with 'Done'", "starter": "", "solution": "const promise = new Promise((resolve, reject) => {\n    resolve('Done');\n});", "hint": "new Promise((resolve, reject) => {})"},
-                     {"type": "fill_blank", "question": "promise.___(result => console.log(result))", "answer": "then"},
-                 ]},
-                {"id": f"{language_id}_5_2", "title": "Async/Await", "description": "Cleaner async code", "xp": 45, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "await can only be used in?", "options": ["async function", "Any function", "Loops", "Callbacks"], "correct": 0},
-                     {"type": "code", "question": "Create async function that awaits promise", "starter": "", "solution": "async function getData() {\n    const result = await fetch('/api/data');\n    return result.json();\n}", "hint": "async function name() { await }"},
-                     {"type": "fill_blank", "question": "___ function fetchData() { await... }", "answer": "async"},
-                 ]},
-                {"id": f"{language_id}_5_3", "title": "Fetch API", "description": "HTTP requests", "xp": 50, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "fetch returns?", "options": ["Promise", "Data directly", "Error", "Array"], "correct": 0},
-                     {"type": "code", "question": "Fetch data from '/api/users'", "starter": "", "solution": "fetch('/api/users')\n    .then(res => res.json())\n    .then(data => console.log(data));", "hint": "fetch(url).then().then()"},
-                     {"type": "fill_blank", "question": "const res = await ___(url);", "answer": "fetch"},
-                 ]},
-                {"id": f"{language_id}_5_4", "title": "Error Handling", "description": "try/catch with async", "xp": 50, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Catch async errors with?", "options": ["try/catch", ".error()", ".fail()", "if/else"], "correct": 0},
-                     {"type": "code", "question": "Wrap fetch in try/catch", "starter": "async function getData() {\n    ", "solution": "async function getData() {\n    try {\n        const res = await fetch('/api');\n        return res.json();\n    } catch (error) {\n        console.error(error);\n    }\n}", "hint": "try { await } catch (e) { }"},
-                     {"type": "fill_blank", "question": "promise.catch(___ => console.log(e))", "answer": "e"},
-                 ]},
-                {"id": f"{language_id}_5_5", "title": "Promise.all", "description": "Multiple promises", "xp": 55, "unit": 5,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Promise.all resolves when?", "options": ["All promises resolve", "First resolves", "Last resolves", "Any rejects"], "correct": 0},
-                     {"type": "code", "question": "Wait for p1 and p2 using Promise.all", "starter": "const p1 = fetch('/api/1');\nconst p2 = fetch('/api/2');\n", "solution": "const p1 = fetch('/api/1');\nconst p2 = fetch('/api/2');\nconst [r1, r2] = await Promise.all([p1, p2]);", "hint": "Promise.all([promises])"},
-                     {"type": "fill_blank", "question": "Promise.___(promises)  // wait for all", "answer": "all"},
-                 ]},
-            ],
-            "dom": [
-                {"id": f"{language_id}_6_1", "title": "Selecting Elements", "description": "Query the DOM", "xp": 35, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Select by ID?", "options": ["getElementById", "querySelector", "getElement", "findById"], "correct": 0},
-                     {"type": "code", "question": "Select element with class 'btn'", "starter": "", "solution": "const btn = document.querySelector('.btn');", "hint": "Use CSS selector syntax"},
-                     {"type": "fill_blank", "question": "document.___('#myId')", "answer": "querySelector"},
-                 ]},
-                {"id": f"{language_id}_6_2", "title": "Modifying Elements", "description": "Change content and styles", "xp": 35, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Change text content?", "options": ["textContent", "innerHTML", "text", "value"], "correct": 0},
-                     {"type": "code", "question": "Change paragraph text to 'Hello'", "starter": "const p = document.querySelector('p');\n", "solution": "const p = document.querySelector('p');\np.textContent = 'Hello';", "hint": "element.textContent = 'text'"},
-                     {"type": "fill_blank", "question": "el.style.___ = 'red';", "answer": "color"},
-                 ]},
-                {"id": f"{language_id}_6_3", "title": "Event Listeners", "description": "Handle user actions", "xp": 40, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Add click handler?", "options": ["addEventListener", "onClick", "onEvent", "clickHandler"], "correct": 0},
-                     {"type": "code", "question": "Add click listener that logs 'Clicked!'", "starter": "const btn = document.querySelector('button');\n", "solution": "const btn = document.querySelector('button');\nbtn.addEventListener('click', () => {\n    console.log('Clicked!');\n});", "hint": "addEventListener('event', callback)"},
-                     {"type": "fill_blank", "question": "btn.___('click', handler)", "answer": "addEventListener"},
-                 ]},
-                {"id": f"{language_id}_6_4", "title": "Creating Elements", "description": "Dynamic DOM creation", "xp": 40, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Create new div?", "options": ["createElement('div')", "new Element('div')", "createDiv()", "addElement('div')"], "correct": 0},
-                     {"type": "code", "question": "Create li element and append to ul", "starter": "const ul = document.querySelector('ul');\n", "solution": "const ul = document.querySelector('ul');\nconst li = document.createElement('li');\nli.textContent = 'Item';\nul.appendChild(li);", "hint": "createElement then appendChild"},
-                     {"type": "fill_blank", "question": "parent.___(child)", "answer": "appendChild"},
-                 ]},
-                {"id": f"{language_id}_6_5", "title": "Forms", "description": "Handle form data", "xp": 45, "unit": 6,
-                 "exercises": [
-                     {"type": "multiple_choice", "question": "Get input value?", "options": ["input.value", "input.text", "input.content", "input.data"], "correct": 0},
-                     {"type": "code", "question": "Prevent form submit and log input value", "starter": "const form = document.querySelector('form');\nconst input = document.querySelector('input');\n", "solution": "const form = document.querySelector('form');\nconst input = document.querySelector('input');\nform.addEventListener('submit', (e) => {\n    e.preventDefault();\n    console.log(input.value);\n});", "hint": "e.preventDefault() stops submit"},
-                     {"type": "fill_blank", "question": "e.___()  // stop default action", "answer": "preventDefault"},
-                 ]},
-            ],
-        }
-    }
-    
-    # Get language-specific lessons or generate generic ones
-    if language_id in lesson_templates:
-        lessons = []
-        for category, category_lessons in lesson_templates[language_id].items():
-            lessons.extend(category_lessons)
-        return lessons
-    
-    # Generate generic lessons for other languages
-    generic_lessons = []
-    units = [
-        ("Basics", ["Hello World", "Variables", "Data Types", "Comments", "Basic I/O"]),
-        ("Control Flow", ["If Statements", "Else & Elif", "Switch/Match", "For Loops", "While Loops"]),
-        ("Functions", ["Defining Functions", "Parameters", "Return Values", "Scope", "Recursion"]),
-        ("Data Structures", ["Arrays/Lists", "Strings", "Dictionaries/Maps", "Sets", "Tuples"]),
-        ("OOP", ["Classes", "Objects", "Inheritance", "Encapsulation", "Polymorphism"]),
-        ("Advanced", ["Error Handling", "File I/O", "Modules", "Libraries", "Best Practices"]),
-    ]
-    
-    lesson_id = 1
-    for unit_num, (unit_name, topics) in enumerate(units, 1):
-        for topic in topics:
-            generic_lessons.append({
-                "id": f"{language_id}_{unit_num}_{lesson_id}",
-                "title": topic,
-                "description": f"Learn about {topic.lower()} in {language_id}",
-                "xp": 10 + (unit_num * 5) + (lesson_id * 2),
-                "unit": unit_num,
-                "exercises": [
-                    {"type": "multiple_choice", "question": f"What is the concept of {topic.lower()}?", 
-                     "options": ["Fundamental concept", "Advanced topic", "Not important", "Optional"], "correct": 0},
-                    {"type": "code", "question": f"Write a basic example of {topic.lower()}", 
-                     "starter": f"// Write your {topic.lower()} code here\n", 
-                     "solution": f"// Example {topic.lower()} code",
-                     "hint": f"Think about how {topic.lower()} works"},
-                    {"type": "fill_blank", "question": f"Complete this {topic.lower()} example: ___", "answer": "code"},
-                ]
-            })
-            lesson_id += 1
-    
-    return generic_lessons
-
-# Pre-generate lessons for all languages  
-LESSONS_CACHE = {lang["id"]: generate_lessons(lang["id"]) for lang in LANGUAGES}
 
 # ============== BADGES ==============
 
 BADGES = [
-    {"id": "first_lesson", "name": "First Steps", "description": "Complete your first lesson", "icon": "footsteps"},
-    {"id": "streak_3", "name": "On Fire!", "description": "3 day streak", "icon": "flame"},
-    {"id": "streak_7", "name": "Week Warrior", "description": "7 day streak", "icon": "calendar"},
-    {"id": "streak_30", "name": "Monthly Master", "description": "30 day streak", "icon": "trophy"},
-    {"id": "xp_100", "name": "Century Club", "description": "Earn 100 XP", "icon": "star"},
-    {"id": "xp_500", "name": "XP Hunter", "description": "Earn 500 XP", "icon": "medal"},
-    {"id": "xp_1000", "name": "XP Legend", "description": "Earn 1000 XP", "icon": "ribbon"},
-    {"id": "perfect_lesson", "name": "Perfectionist", "description": "100% on a lesson", "icon": "checkmark-circle"},
-    {"id": "polyglot", "name": "Polyglot", "description": "Study 3 languages", "icon": "language"},
-    {"id": "night_owl", "name": "Night Owl", "description": "Study after midnight", "icon": "moon"},
-    {"id": "early_bird", "name": "Early Bird", "description": "Study before 6 AM", "icon": "sunny"},
-    {"id": "social_butterfly", "name": "Social Butterfly", "description": "Add 5 friends", "icon": "people"},
+    {"id": "first_lesson", "name": "First Steps", "description": "Complete your first lesson", "icon": "footsteps", "xp_reward": 10},
+    {"id": "streak_3", "name": "On Fire!", "description": "3 day streak", "icon": "flame", "xp_reward": 25},
+    {"id": "streak_7", "name": "Week Warrior", "description": "7 day streak", "icon": "calendar", "xp_reward": 50},
+    {"id": "streak_30", "name": "Monthly Master", "description": "30 day streak", "icon": "trophy", "xp_reward": 200},
+    {"id": "xp_100", "name": "Century Club", "description": "Earn 100 XP", "icon": "star", "xp_reward": 20},
+    {"id": "xp_500", "name": "XP Hunter", "description": "Earn 500 XP", "icon": "medal", "xp_reward": 50},
+    {"id": "xp_1000", "name": "XP Legend", "description": "Earn 1000 XP", "icon": "ribbon", "xp_reward": 100},
+    {"id": "xp_5000", "name": "XP Master", "description": "Earn 5000 XP", "icon": "diamond", "xp_reward": 250},
+    {"id": "perfect_lesson", "name": "Perfectionist", "description": "100% on a lesson", "icon": "checkmark-circle", "xp_reward": 15},
+    {"id": "polyglot", "name": "Polyglot", "description": "Study 3 languages", "icon": "language", "xp_reward": 50},
+    {"id": "polyglot_master", "name": "Polyglot Master", "description": "Study 5 languages", "icon": "earth", "xp_reward": 100},
+    {"id": "night_owl", "name": "Night Owl", "description": "Study after midnight", "icon": "moon", "xp_reward": 10},
+    {"id": "early_bird", "name": "Early Bird", "description": "Study before 6 AM", "icon": "sunny", "xp_reward": 10},
+    {"id": "social_butterfly", "name": "Social Butterfly", "description": "Add 5 friends", "icon": "people", "xp_reward": 30},
+    {"id": "speed_demon", "name": "Speed Demon", "description": "Complete lesson under 2 min", "icon": "speedometer", "xp_reward": 25},
+    {"id": "combo_king", "name": "Combo King", "description": "Get 5x combo multiplier", "icon": "flash", "xp_reward": 40},
+    {"id": "daily_achiever", "name": "Daily Achiever", "description": "Meet daily goal 7 days", "icon": "fitness", "xp_reward": 75},
+    {"id": "lesson_master", "name": "Lesson Master", "description": "Complete 50 lessons", "icon": "school", "xp_reward": 100},
+    {"id": "lesson_legend", "name": "Lesson Legend", "description": "Complete 100 lessons", "icon": "library", "xp_reward": 200},
+    {"id": "no_mistakes", "name": "Flawless", "description": "Complete 5 lessons with no mistakes", "icon": "shield", "xp_reward": 60},
 ]
 
-async def get_optional_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        token = credentials.credentials
-        session = await db.sessions.find_one({"token": token})
-        if not session:
-            return None
-        user = await db.users.find_one({"id": session["user_id"]})
-        return user
-    except:
-        return None
+# ============== LESSON GENERATION WITH 10 EXERCISES ==============
+
+def generate_exercises_python(lesson_id: str, lesson_title: str, unit: int) -> List[dict]:
+    """Generate 10 exercises for Python lessons"""
+    exercises = []
+    
+    if "hello world" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "What function prints output in Python?", "options": ["print()", "echo()", "console.log()", "System.out.println()"], "correct": 0},
+            {"type": "multiple_choice", "question": "Which is the correct syntax to print 'Hello'?", "options": ["print('Hello')", "print Hello", "echo 'Hello'", "printf('Hello')"], "correct": 0},
+            {"type": "code", "question": "Write code to print 'Hello, World!'", "starter": "", "solution": "print('Hello, World!')", "hint": "Use the print() function with a string"},
+            {"type": "fill_blank", "question": "Complete: ___('Hello')", "answer": "print"},
+            {"type": "multiple_choice", "question": "What type of quotes can you use for strings?", "options": ["Both single and double", "Only single", "Only double", "Neither"], "correct": 0},
+            {"type": "code", "question": "Print your name", "starter": "", "solution": "print('YourName')", "hint": "Replace YourName with any name"},
+            {"type": "multiple_choice", "question": "What happens if you forget the closing parenthesis?", "options": ["Syntax error", "Nothing prints", "Prints None", "Program crashes"], "correct": 0},
+            {"type": "fill_blank", "question": "print('Hi')  # This is a ___", "answer": "comment"},
+            {"type": "code", "question": "Print two lines: 'Line 1' and 'Line 2'", "starter": "", "solution": "print('Line 1')\nprint('Line 2')", "hint": "Use two print statements"},
+            {"type": "multiple_choice", "question": "Which prints on a new line by default?", "options": ["print() in Python", "printf() in C", "echo in PHP", "All of the above"], "correct": 0},
+        ]
+    elif "variable" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "How do you create a variable in Python?", "options": ["name = 'John'", "var name = 'John'", "let name = 'John'", "String name = 'John'"], "correct": 0},
+            {"type": "code", "question": "Create a variable called 'age' with value 25", "starter": "", "solution": "age = 25", "hint": "variable_name = value"},
+            {"type": "multiple_choice", "question": "What type is the variable: x = 3.14?", "options": ["float", "int", "str", "bool"], "correct": 0},
+            {"type": "fill_blank", "question": "x ___ 10  # Assign 10 to x", "answer": "="},
+            {"type": "multiple_choice", "question": "Which is a valid variable name?", "options": ["my_var", "2var", "my-var", "my var"], "correct": 0},
+            {"type": "code", "question": "Create two variables: x=5 and y=10, then print their sum", "starter": "", "solution": "x = 5\ny = 10\nprint(x + y)", "hint": "Create variables then use + to add"},
+            {"type": "multiple_choice", "question": "Can you change a variable's value after creating it?", "options": ["Yes", "No", "Only if it's a number", "Only once"], "correct": 0},
+            {"type": "fill_blank", "question": "To check a variable's type, use _____(x)", "answer": "type"},
+            {"type": "code", "question": "Swap values of a=1 and b=2", "starter": "a = 1\nb = 2\n", "solution": "a = 1\nb = 2\na, b = b, a", "hint": "Python allows tuple unpacking"},
+            {"type": "multiple_choice", "question": "What is None in Python?", "options": ["Absence of value", "Zero", "Empty string", "False"], "correct": 0},
+        ]
+    elif "data type" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "Which is a string?", "options": ["'Hello'", "42", "3.14", "True"], "correct": 0},
+            {"type": "code", "question": "Create a boolean variable 'is_active' set to True", "starter": "", "solution": "is_active = True", "hint": "Boolean values are True or False"},
+            {"type": "fill_blank", "question": "Convert '42' to int: int(___)", "answer": "'42'"},
+            {"type": "multiple_choice", "question": "What is type(42)?", "options": ["<class 'int'>", "<class 'float'>", "<class 'str'>", "<class 'num'>"], "correct": 0},
+            {"type": "code", "question": "Convert the integer 10 to a string", "starter": "", "solution": "str(10)", "hint": "Use str() function"},
+            {"type": "multiple_choice", "question": "What is 5 / 2 in Python 3?", "options": ["2.5", "2", "3", "2.0"], "correct": 0},
+            {"type": "fill_blank", "question": "True and False are ___ values", "answer": "boolean"},
+            {"type": "code", "question": "Create a list with numbers 1, 2, 3", "starter": "", "solution": "numbers = [1, 2, 3]", "hint": "Use square brackets"},
+            {"type": "multiple_choice", "question": "Which is mutable?", "options": ["list", "tuple", "string", "int"], "correct": 0},
+            {"type": "code", "question": "Check if 'hello' is a string using type()", "starter": "", "solution": "type('hello')", "hint": "type() returns the type"},
+        ]
+    elif "string" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "How to get string length?", "options": ["len(s)", "s.length", "s.size()", "length(s)"], "correct": 0},
+            {"type": "code", "question": "Concatenate 'Hello' and 'World' with a space", "starter": "", "solution": "'Hello' + ' ' + 'World'", "hint": "Use + to join strings"},
+            {"type": "multiple_choice", "question": "What is 'Python'[0]?", "options": ["P", "y", "Python", "Error"], "correct": 0},
+            {"type": "fill_blank", "question": "'hello'.___() returns 'HELLO'", "answer": "upper"},
+            {"type": "code", "question": "Get the last character of 'Python'", "starter": "", "solution": "'Python'[-1]", "hint": "Use negative indexing"},
+            {"type": "multiple_choice", "question": "What does 'abc' * 3 return?", "options": ["'abcabcabc'", "'abc3'", "Error", "9"], "correct": 0},
+            {"type": "code", "question": "Split 'a,b,c' by comma", "starter": "", "solution": "'a,b,c'.split(',')", "hint": "Use .split() method"},
+            {"type": "fill_blank", "question": "'  hello  '.___() removes whitespace", "answer": "strip"},
+            {"type": "multiple_choice", "question": "f-strings start with?", "options": ["f'...'", "s'...'", "'...'.format()", "str(...)"], "correct": 0},
+            {"type": "code", "question": "Create f-string: 'Name: {name}' where name='Alice'", "starter": "name = 'Alice'\n", "solution": "name = 'Alice'\nf'Name: {name}'", "hint": "Use f-string syntax"},
+        ]
+    elif "number" in lesson_title.lower() or "math" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "What is 7 // 2 in Python?", "options": ["3", "3.5", "4", "2"], "correct": 0},
+            {"type": "code", "question": "Calculate 2 to the power of 8", "starter": "", "solution": "2 ** 8", "hint": "Use ** for exponentiation"},
+            {"type": "fill_blank", "question": "Modulo operator: 10 ___ 3 = 1", "answer": "%"},
+            {"type": "multiple_choice", "question": "What is abs(-5)?", "options": ["5", "-5", "0", "Error"], "correct": 0},
+            {"type": "code", "question": "Round 3.7 to nearest integer", "starter": "", "solution": "round(3.7)", "hint": "Use round() function"},
+            {"type": "multiple_choice", "question": "What is max(1, 5, 3)?", "options": ["5", "1", "3", "9"], "correct": 0},
+            {"type": "fill_blank", "question": "import ___ to use sqrt()", "answer": "math"},
+            {"type": "code", "question": "Get the minimum of 4, 2, 8", "starter": "", "solution": "min(4, 2, 8)", "hint": "Use min() function"},
+            {"type": "multiple_choice", "question": "10 / 3 returns what type?", "options": ["float", "int", "str", "None"], "correct": 0},
+            {"type": "code", "question": "Calculate floor division of 17 by 5", "starter": "", "solution": "17 // 5", "hint": "Use // for floor division"},
+        ]
+    elif "if" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "What keyword starts a conditional?", "options": ["if", "when", "case", "check"], "correct": 0},
+            {"type": "code", "question": "Write if statement: if age >= 18 print 'Adult'", "starter": "age = 20\n", "solution": "age = 20\nif age >= 18:\n    print('Adult')", "hint": "Remember the colon and indentation"},
+            {"type": "fill_blank", "question": "if x > 5___", "answer": ":"},
+            {"type": "multiple_choice", "question": "What is the comparison operator for 'not equal'?", "options": ["!=", "<>", "=/=", "not="], "correct": 0},
+            {"type": "code", "question": "Check if number is positive, negative, or zero", "starter": "num = 5\n", "solution": "num = 5\nif num > 0:\n    print('Positive')\nelif num < 0:\n    print('Negative')\nelse:\n    print('Zero')", "hint": "Use if, elif, else"},
+            {"type": "multiple_choice", "question": "What does 'and' do in conditions?", "options": ["Both must be True", "Either can be True", "Neither must be True", "Inverts the condition"], "correct": 0},
+            {"type": "fill_blank", "question": "if x > 0 ___ x < 10:  # both conditions", "answer": "and"},
+            {"type": "code", "question": "Write: if x is between 1 and 10 (inclusive)", "starter": "x = 5\n", "solution": "x = 5\nif 1 <= x <= 10:\n    print('In range')", "hint": "Python allows chained comparisons"},
+            {"type": "multiple_choice", "question": "What is 'not True'?", "options": ["False", "True", "None", "Error"], "correct": 0},
+            {"type": "code", "question": "Check if a string is empty", "starter": "s = ''\n", "solution": "s = ''\nif not s:\n    print('Empty')", "hint": "Empty strings are falsy"},
+        ]
+    elif "loop" in lesson_title.lower() and "for" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "What does range(5) produce?", "options": ["0,1,2,3,4", "1,2,3,4,5", "0,1,2,3,4,5", "1,2,3,4"], "correct": 0},
+            {"type": "code", "question": "Print numbers 1 to 5 using for loop", "starter": "", "solution": "for i in range(1, 6):\n    print(i)", "hint": "range(start, end) - end is exclusive"},
+            {"type": "fill_blank", "question": "for item ___ my_list:", "answer": "in"},
+            {"type": "multiple_choice", "question": "What is range(0, 10, 2)?", "options": ["0,2,4,6,8", "0,2,4,6,8,10", "2,4,6,8,10", "0,1,2,3,4"], "correct": 0},
+            {"type": "code", "question": "Sum numbers from 1 to 10 using for loop", "starter": "", "solution": "total = 0\nfor i in range(1, 11):\n    total += i", "hint": "Use += to accumulate"},
+            {"type": "multiple_choice", "question": "Can you loop through a string?", "options": ["Yes, character by character", "No", "Only with index", "Only backwards"], "correct": 0},
+            {"type": "code", "question": "Print each character in 'hello'", "starter": "", "solution": "for char in 'hello':\n    print(char)", "hint": "Strings are iterable"},
+            {"type": "fill_blank", "question": "for i in ___(len(items)):", "answer": "range"},
+            {"type": "code", "question": "Print indices and values of [10, 20, 30]", "starter": "", "solution": "for i, val in enumerate([10, 20, 30]):\n    print(i, val)", "hint": "Use enumerate()"},
+            {"type": "multiple_choice", "question": "What is enumerate() used for?", "options": ["Index and value", "Just index", "Just value", "Sorting"], "correct": 0},
+        ]
+    elif "while" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "When does a while loop stop?", "options": ["When condition is False", "After 10 iterations", "Never", "When break is called only"], "correct": 0},
+            {"type": "code", "question": "Count down from 5 to 1 using while", "starter": "", "solution": "count = 5\nwhile count > 0:\n    print(count)\n    count -= 1", "hint": "Don't forget to decrement!"},
+            {"type": "fill_blank", "question": "___ x > 0:", "answer": "while"},
+            {"type": "multiple_choice", "question": "What is an infinite loop?", "options": ["Loop that never ends", "Loop with no body", "Loop with break", "Nested loop"], "correct": 0},
+            {"type": "code", "question": "Sum numbers until sum exceeds 100", "starter": "", "solution": "total = 0\ni = 1\nwhile total <= 100:\n    total += i\n    i += 1", "hint": "Keep adding until condition fails"},
+            {"type": "multiple_choice", "question": "What does 'break' do?", "options": ["Exit the loop", "Skip iteration", "Pause loop", "Restart loop"], "correct": 0},
+            {"type": "code", "question": "Find first number divisible by 7 starting from 1", "starter": "", "solution": "num = 1\nwhile num % 7 != 0:\n    num += 1\nprint(num)", "hint": "Use modulo to check divisibility"},
+            {"type": "fill_blank", "question": "Use ___ to skip to next iteration", "answer": "continue"},
+            {"type": "code", "question": "Print numbers 1-10, skip number 5", "starter": "", "solution": "i = 0\nwhile i < 10:\n    i += 1\n    if i == 5:\n        continue\n    print(i)", "hint": "Use continue to skip"},
+            {"type": "multiple_choice", "question": "while True creates what?", "options": ["Infinite loop", "Error", "Single iteration", "No loop"], "correct": 0},
+        ]
+    elif "function" in lesson_title.lower() and "defin" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "Which keyword defines a function?", "options": ["def", "function", "func", "define"], "correct": 0},
+            {"type": "code", "question": "Create a function greet() that prints 'Hello!'", "starter": "", "solution": "def greet():\n    print('Hello!')", "hint": "def function_name():"},
+            {"type": "fill_blank", "question": "___ my_function():", "answer": "def"},
+            {"type": "multiple_choice", "question": "How do you call a function named 'test'?", "options": ["test()", "call test", "run test()", "test"], "correct": 0},
+            {"type": "code", "question": "Create function add(a, b) that returns a + b", "starter": "", "solution": "def add(a, b):\n    return a + b", "hint": "Use return to give back a value"},
+            {"type": "multiple_choice", "question": "What if a function has no return?", "options": ["Returns None", "Error", "Returns 0", "Returns empty string"], "correct": 0},
+            {"type": "code", "question": "Create function is_even(n) that returns True if n is even", "starter": "", "solution": "def is_even(n):\n    return n % 2 == 0", "hint": "Even numbers have no remainder when divided by 2"},
+            {"type": "fill_blank", "question": "def greet(name='Guest'):  # 'Guest' is a ___ argument", "answer": "default"},
+            {"type": "code", "question": "Create function that takes *args and returns their sum", "starter": "", "solution": "def sum_all(*args):\n    return sum(args)", "hint": "*args collects all positional arguments"},
+            {"type": "multiple_choice", "question": "What is **kwargs used for?", "options": ["Keyword arguments", "All arguments", "No arguments", "Required arguments"], "correct": 0},
+        ]
+    elif "list" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "How to create an empty list?", "options": ["[]", "{}", "()", "list{}"], "correct": 0},
+            {"type": "code", "question": "Create a list with 1, 2, 3 and append 4", "starter": "", "solution": "nums = [1, 2, 3]\nnums.append(4)", "hint": "Use .append() method"},
+            {"type": "fill_blank", "question": "my_list.___(5)  # add 5 to end", "answer": "append"},
+            {"type": "multiple_choice", "question": "What does pop() do?", "options": ["Remove and return last item", "Remove first item", "Add item", "Clear list"], "correct": 0},
+            {"type": "code", "question": "Get the first 3 elements of [1,2,3,4,5]", "starter": "", "solution": "[1,2,3,4,5][:3]", "hint": "Use slicing [:3]"},
+            {"type": "multiple_choice", "question": "How to insert at index 0?", "options": [".insert(0, x)", ".add(0, x)", ".put(0, x)", "[0] = x"], "correct": 0},
+            {"type": "code", "question": "Reverse the list [1, 2, 3]", "starter": "", "solution": "[1, 2, 3][::-1]", "hint": "Use [::-1] slicing"},
+            {"type": "fill_blank", "question": "list1 ___ list2  # combine lists", "answer": "+"},
+            {"type": "code", "question": "Create list of squares from 1 to 5 using comprehension", "starter": "", "solution": "[x**2 for x in range(1, 6)]", "hint": "[expression for item in iterable]"},
+            {"type": "multiple_choice", "question": "What is [1,2,3].index(2)?", "options": ["1", "2", "0", "3"], "correct": 0},
+        ]
+    elif "dict" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "Dict syntax?", "options": ["{'key': 'value'}", "['key': 'value']", "('key': 'value')", "{key = value}"], "correct": 0},
+            {"type": "code", "question": "Create a dict with name='John' and age=30", "starter": "", "solution": "person = {'name': 'John', 'age': 30}", "hint": "Use curly braces and colons"},
+            {"type": "fill_blank", "question": "Get all keys: dict.___()", "answer": "keys"},
+            {"type": "multiple_choice", "question": "How to access dict['key'] safely?", "options": ["dict.get('key')", "dict.safe('key')", "dict.find('key')", "dict('key')"], "correct": 0},
+            {"type": "code", "question": "Add 'city': 'NYC' to existing dict", "starter": "person = {'name': 'John'}\n", "solution": "person = {'name': 'John'}\nperson['city'] = 'NYC'", "hint": "dict['new_key'] = value"},
+            {"type": "multiple_choice", "question": "What returns dict values?", "options": [".values()", ".items()", ".keys()", ".data()"], "correct": 0},
+            {"type": "code", "question": "Loop through dict items (key and value)", "starter": "d = {'a': 1, 'b': 2}\n", "solution": "d = {'a': 1, 'b': 2}\nfor k, v in d.items():\n    print(k, v)", "hint": "Use .items()"},
+            {"type": "fill_blank", "question": "dict.get('key', ___) returns default if key missing", "answer": "default"},
+            {"type": "code", "question": "Merge two dicts using {**d1, **d2}", "starter": "d1 = {'a': 1}\nd2 = {'b': 2}\n", "solution": "d1 = {'a': 1}\nd2 = {'b': 2}\nmerged = {**d1, **d2}", "hint": "Use ** to unpack dicts"},
+            {"type": "multiple_choice", "question": "Can dict keys be lists?", "options": ["No, must be immutable", "Yes", "Only strings", "Only numbers"], "correct": 0},
+        ]
+    elif "class" in lesson_title.lower():
+        exercises = [
+            {"type": "multiple_choice", "question": "Keyword to define a class?", "options": ["class", "def", "object", "new"], "correct": 0},
+            {"type": "code", "question": "Create an empty class called Dog", "starter": "", "solution": "class Dog:\n    pass", "hint": "Use pass for empty body"},
+            {"type": "fill_blank", "question": "___ MyClass:", "answer": "class"},
+            {"type": "multiple_choice", "question": "Constructor method name?", "options": ["__init__", "__new__", "__create__", "__start__"], "correct": 0},
+            {"type": "code", "question": "Add __init__ with name parameter to Dog class", "starter": "", "solution": "class Dog:\n    def __init__(self, name):\n        self.name = name", "hint": "First param is always self"},
+            {"type": "fill_blank", "question": "def __init__(___,  name):", "answer": "self"},
+            {"type": "code", "question": "Add bark() method that prints 'Woof!'", "starter": "class Dog:\n    def __init__(self, name):\n        self.name = name\n", "solution": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    def bark(self):\n        print('Woof!')", "hint": "def method_name(self):"},
+            {"type": "multiple_choice", "question": "How to create an instance?", "options": ["Dog('Rex')", "new Dog('Rex')", "Dog.create('Rex')", "create Dog('Rex')"], "correct": 0},
+            {"type": "code", "question": "Create Puppy class that inherits from Dog", "starter": "class Dog:\n    pass\n", "solution": "class Dog:\n    pass\n\nclass Puppy(Dog):\n    pass", "hint": "class Child(Parent):"},
+            {"type": "multiple_choice", "question": "Call parent's __init__ using?", "options": ["super().__init__()", "parent.__init__()", "base.__init__()", "this.__init__()"], "correct": 0},
+        ]
+    else:
+        # Generic exercises for other lessons
+        exercises = [
+            {"type": "multiple_choice", "question": f"What is the main concept in '{lesson_title}'?", "options": ["Fundamental programming concept", "Advanced only", "Not important", "Optional"], "correct": 0},
+            {"type": "code", "question": f"Write a basic example of {lesson_title.lower()}", "starter": "# Your code here\n", "solution": "# Example code", "hint": f"Think about how {lesson_title.lower()} works"},
+            {"type": "fill_blank", "question": "Complete this example: ___", "answer": "code"},
+            {"type": "multiple_choice", "question": "Why is this concept important?", "options": ["Code organization", "Not needed", "Only for experts", "Deprecated"], "correct": 0},
+            {"type": "code", "question": "Implement a simple version", "starter": "", "solution": "pass", "hint": "Start simple"},
+            {"type": "fill_blank", "question": "Key keyword: ___", "answer": "def"},
+            {"type": "multiple_choice", "question": "Common use case?", "options": ["Data processing", "Never used", "Only testing", "Graphics only"], "correct": 0},
+            {"type": "code", "question": "Write another example", "starter": "", "solution": "# Code", "hint": "Practice makes perfect"},
+            {"type": "multiple_choice", "question": "Best practice?", "options": ["Keep it simple", "Make it complex", "Avoid using", "Copy paste"], "correct": 0},
+            {"type": "fill_blank", "question": "Remember: ___ is key", "answer": "practice"},
+        ]
+    
+    return exercises
+
+def generate_lessons(language_id: str) -> List[dict]:
+    """Generate comprehensive lessons with 10 exercises each"""
+    
+    # Define units and lessons per unit
+    units_config = {
+        "python": [
+            ("Basics", ["Hello World", "Variables", "Data Types", "String Operations", "Numbers & Math"]),
+            ("Control Flow", ["If Statements", "Else & Elif", "For Loops", "While Loops", "Break & Continue"]),
+            ("Functions", ["Defining Functions", "Parameters", "Return Values", "Lambda Functions", "Scope"]),
+            ("Data Structures", ["Lists", "List Methods", "Dictionaries", "Tuples", "Sets"]),
+            ("OOP", ["Classes Intro", "Constructor", "Methods", "Inheritance", "Encapsulation"]),
+            ("Advanced", ["List Comprehension", "File Handling", "Exception Handling", "Decorators", "Generators"]),
+        ],
+        "javascript": [
+            ("Basics", ["Hello World", "Variables", "Data Types", "Strings", "Operators"]),
+            ("Control Flow", ["If Statements", "Ternary Operator", "For Loops", "While Loops", "Array Methods"]),
+            ("Functions", ["Function Declaration", "Arrow Functions", "Parameters", "Callbacks", "Closures"]),
+            ("Objects", ["Object Basics", "Methods", "Destructuring", "Spread & Rest", "Classes"]),
+            ("Async", ["Promises", "Async/Await", "Fetch API", "Error Handling", "Promise.all"]),
+            ("DOM", ["Selecting Elements", "Modifying Elements", "Events", "Creating Elements", "Forms"]),
+        ],
+        "shell": [
+            ("Basics", ["Echo & Print", "Variables", "Comments", "Command Syntax", "Exit Codes"]),
+            ("Files", ["File Operations", "Directory Commands", "Permissions", "File Content", "Finding Files"]),
+            ("Control Flow", ["If Statements", "Case Statements", "For Loops", "While Loops", "Until Loops"]),
+            ("Text Processing", ["Grep", "Sed", "Awk", "Cut & Sort", "Pipes"]),
+            ("Scripting", ["Script Structure", "Arguments", "Functions", "Arrays", "Error Handling"]),
+            ("Advanced", ["Process Management", "Cron Jobs", "Debugging", "Best Practices", "Real Scripts"]),
+        ],
+        "elixir": [
+            ("Basics", ["Hello World", "Data Types", "Variables", "Pattern Matching", "Operators"]),
+            ("Collections", ["Lists", "Tuples", "Keyword Lists", "Maps", "Enum Module"]),
+            ("Control Flow", ["If & Unless", "Case", "Cond", "With", "Comprehensions"]),
+            ("Functions", ["Anonymous Functions", "Named Functions", "Guards", "Default Arguments", "Pipe Operator"]),
+            ("Modules", ["Module Basics", "Attributes", "Structs", "Protocols", "Behaviours"]),
+            ("Concurrency", ["Processes", "Message Passing", "GenServer", "Supervisors", "Tasks"]),
+        ],
+        "zig": [
+            ("Basics", ["Hello World", "Variables", "Types", "Comments", "Operators"]),
+            ("Control Flow", ["If Expressions", "For Loops", "While Loops", "Switch", "Optionals"]),
+            ("Functions", ["Function Basics", "Parameters", "Error Handling", "Inline Functions", "Comptime"]),
+            ("Memory", ["Pointers", "Slices", "Arrays", "Allocators", "Memory Safety"]),
+            ("Structs", ["Struct Basics", "Methods", "Packed Structs", "Enums", "Unions"]),
+            ("Advanced", ["Generics", "Build System", "C Interop", "SIMD", "Async I/O"]),
+        ],
+    }
+    
+    # Get config for this language or use generic
+    if language_id in units_config:
+        units = units_config[language_id]
+    else:
+        units = [
+            ("Basics", ["Hello World", "Variables", "Data Types", "Comments", "Basic I/O"]),
+            ("Control Flow", ["If Statements", "Else & Elif", "Switch/Match", "For Loops", "While Loops"]),
+            ("Functions", ["Defining Functions", "Parameters", "Return Values", "Scope", "Recursion"]),
+            ("Data Structures", ["Arrays/Lists", "Strings", "Dictionaries/Maps", "Sets", "Tuples"]),
+            ("OOP", ["Classes", "Objects", "Inheritance", "Encapsulation", "Polymorphism"]),
+            ("Advanced", ["Error Handling", "File I/O", "Modules", "Libraries", "Best Practices"]),
+        ]
+    
+    lessons = []
+    for unit_num, (unit_name, topics) in enumerate(units, 1):
+        for topic_idx, topic in enumerate(topics):
+            lesson_id = f"{language_id}_{unit_num}_{topic_idx + 1}"
+            
+            # Generate exercises based on language
+            if language_id == "python":
+                exercises = generate_exercises_python(lesson_id, topic, unit_num)
+            else:
+                # Generic exercises with 10 questions
+                exercises = generate_generic_exercises(language_id, topic, unit_num)
+            
+            lessons.append({
+                "id": lesson_id,
+                "title": topic,
+                "description": f"Learn about {topic.lower()}",
+                "xp": 15 + (unit_num * 5) + (topic_idx * 3),
+                "unit": unit_num,
+                "unit_name": unit_name,
+                "exercises": exercises,
+            })
+    
+    return lessons
+
+def generate_generic_exercises(language_id: str, topic: str, unit: int) -> List[dict]:
+    """Generate 10 generic exercises for any language"""
+    exercises = []
+    
+    # Create varied exercise types
+    exercise_templates = [
+        {"type": "multiple_choice", "question": f"What is {topic.lower()} used for?", "options": ["Core functionality", "Optional feature", "Deprecated", "Not available"], "correct": 0},
+        {"type": "code", "question": f"Write a basic {topic.lower()} example", "starter": f"// {topic} example\n", "solution": f"// {topic} implementation", "hint": f"Think about {topic.lower()} syntax"},
+        {"type": "fill_blank", "question": f"The key concept in {topic.lower()} is ___", "answer": "code"},
+        {"type": "multiple_choice", "question": f"Why is {topic.lower()} important?", "options": ["Improves code quality", "Not important", "Only for experts", "Rarely used"], "correct": 0},
+        {"type": "code", "question": f"Implement a {topic.lower()} function", "starter": "", "solution": "// Implementation", "hint": "Start with the basics"},
+        {"type": "multiple_choice", "question": f"Common mistake with {topic.lower()}?", "options": ["Forgetting syntax", "Using too much", "No mistakes possible", "Never happens"], "correct": 0},
+        {"type": "fill_blank", "question": f"Best practice for {topic.lower()}: ___ your code", "answer": "test"},
+        {"type": "code", "question": f"Write another {topic.lower()} example", "starter": "", "solution": "// Code here", "hint": "Practice makes perfect"},
+        {"type": "multiple_choice", "question": f"When to use {topic.lower()}?", "options": ["Appropriate situations", "Never", "Always", "Randomly"], "correct": 0},
+        {"type": "fill_blank", "question": f"Remember: {topic.lower()} requires ___", "answer": "practice"},
+    ]
+    
+    return exercise_templates
+
+# Pre-generate lessons for all languages
+LESSONS_CACHE = {lang["id"]: generate_lessons(lang["id"]) for lang in LANGUAGES}
+
+# ============== DAILY CHALLENGES ==============
+
+def generate_daily_challenge() -> dict:
+    """Generate a random daily challenge"""
+    challenge_types = [
+        {
+            "type": "speed_round",
+            "title": "Speed Round",
+            "description": "Answer 5 questions in 2 minutes",
+            "xp_reward": 50,
+            "gem_reward": 5,
+            "time_limit": 120,
+            "exercises": random.sample([
+                {"type": "multiple_choice", "question": "What is 2 + 2?", "options": ["3", "4", "5", "6"], "correct": 1},
+                {"type": "fill_blank", "question": "print('Hello ___')", "answer": "World"},
+                {"type": "multiple_choice", "question": "Which is a loop?", "options": ["for", "if", "def", "class"], "correct": 0},
+                {"type": "fill_blank", "question": "def function___:", "answer": "()"},
+                {"type": "multiple_choice", "question": "String + String is?", "options": ["Concatenation", "Addition", "Error", "None"], "correct": 0},
+            ], 5),
+        },
+        {
+            "type": "code_master",
+            "title": "Code Master",
+            "description": "Solve 3 coding challenges",
+            "xp_reward": 75,
+            "gem_reward": 10,
+            "time_limit": 300,
+            "exercises": [
+                {"type": "code", "question": "Write a function to add two numbers", "starter": "", "solution": "def add(a, b):\n    return a + b", "hint": "Use return"},
+                {"type": "code", "question": "Create a list with 1,2,3", "starter": "", "solution": "nums = [1, 2, 3]", "hint": "Use square brackets"},
+                {"type": "code", "question": "Print numbers 1 to 5", "starter": "", "solution": "for i in range(1, 6):\n    print(i)", "hint": "Use for loop"},
+            ],
+        },
+        {
+            "type": "knowledge_quiz",
+            "title": "Knowledge Quiz",
+            "description": "Test your programming knowledge",
+            "xp_reward": 40,
+            "gem_reward": 3,
+            "time_limit": 180,
+            "exercises": [
+                {"type": "multiple_choice", "question": "Python was created by?", "options": ["Guido van Rossum", "Dennis Ritchie", "James Gosling", "Bjarne Stroustrup"], "correct": 0},
+                {"type": "multiple_choice", "question": "JavaScript runs in?", "options": ["Browser", "Only server", "Only desktop", "Only mobile"], "correct": 0},
+                {"type": "multiple_choice", "question": "HTML stands for?", "options": ["HyperText Markup Language", "High Tech ML", "Home Tool ML", "Hyper Transfer ML"], "correct": 0},
+            ],
+        },
+    ]
+    
+    challenge = random.choice(challenge_types)
+    challenge["id"] = f"daily_{datetime.utcnow().strftime('%Y%m%d')}"
+    challenge["date"] = datetime.utcnow().strftime('%Y-%m-%d')
+    return challenge
 
 # ============== AUTH ROUTES ==============
 
 @api_router.post("/auth/register")
 async def register(user: UserCreate):
-    # Check if user exists
     existing = await db.users.find_one({"$or": [{"email": user.email}, {"username": user.username}]})
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
     
-    # Create user
     user_dict = {
         "id": str(uuid.uuid4()),
         "username": user.username,
@@ -598,20 +647,37 @@ async def register(user: UserCreate):
         "streak": 0,
         "hearts": 5,
         "max_hearts": 5,
+        "gems": 10,  # Starting gems
         "last_activity": None,
         "badges": [],
         "friends": [],
         "friend_requests": [],
         "languages_studied": [],
+        "daily_goal": 50,
+        "daily_xp": 0,
+        "daily_goal_streak": 0,
+        "combo_multiplier": 1.0,
+        "consecutive_correct": 0,
+        "total_lessons_completed": 0,
+        "perfect_lessons": 0,
+        "settings": {
+            "font_size": "medium",
+            "high_contrast": False,
+            "reduced_motion": False,
+            "sound_effects": True,
+            "notifications": True,
+            "daily_reminder": True,
+            "theme": "dark",
+        },
+        "daily_challenges_completed": [],
         "created_at": datetime.utcnow().isoformat(),
     }
     await db.users.insert_one(user_dict)
     
-    # Create session
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user_dict["id"]})
     
-    return {"token": token, "user": UserResponse(**user_dict)}
+    return {"token": token, "user": user_dict}
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
@@ -619,7 +685,6 @@ async def login(credentials: UserLogin):
     if not user or user["password"] != hash_password(credentials.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Update streak
     now = datetime.utcnow()
     if user.get("last_activity"):
         last = datetime.fromisoformat(user["last_activity"])
@@ -632,25 +697,44 @@ async def login(credentials: UserLogin):
         user["streak"] = 1
     
     user["last_activity"] = now.isoformat()
-    # Refill hearts if new day
     user["hearts"] = user.get("max_hearts", 5)
+    user["daily_xp"] = 0  # Reset daily XP
+    user["combo_multiplier"] = 1.0  # Reset combo
+    user["consecutive_correct"] = 0
     
     await db.users.update_one({"id": user["id"]}, {"$set": user})
     
-    # Create session
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user["id"]})
     
-    return {"token": token, "user": UserResponse(**user)}
+    user.pop("password", None)
+    user.pop("_id", None)
+    return {"token": token, "user": user}
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return UserResponse(**user)
+    user.pop("password", None)
+    user.pop("_id", None)
+    return user
 
 @api_router.post("/auth/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     await db.sessions.delete_one({"token": credentials.credentials})
     return {"message": "Logged out"}
+
+# ============== SETTINGS ROUTES ==============
+
+@api_router.put("/settings")
+async def update_settings(settings_update: SettingsUpdate, user: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"settings": settings_update.settings}}
+    )
+    return {"message": "Settings updated", "settings": settings_update.settings}
+
+@api_router.get("/settings")
+async def get_settings(user: dict = Depends(get_current_user)):
+    return user.get("settings", {})
 
 # ============== LANGUAGE ROUTES ==============
 
@@ -664,9 +748,8 @@ async def get_lessons(language_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Language not found")
     
     lessons = LESSONS_CACHE[language_id]
-    
-    # Try to get user for progress tracking
     completed_ids = set()
+    
     auth_header = request.headers.get("authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
@@ -677,12 +760,11 @@ async def get_lessons(language_id: str, request: Request):
                 progress = await db.progress.find({"user_id": user["id"], "language": language_id}).to_list(1000)
                 completed_ids = {p["lesson_id"] for p in progress if p.get("completed")}
     
-    # Add completion status to lessons
     result = []
     for lesson in lessons:
         lesson_copy = lesson.copy()
         lesson_copy["completed"] = lesson["id"] in completed_ids
-        # Remove exercises from list view for smaller response
+        lesson_copy["exercise_count"] = len(lesson.get("exercises", []))
         lesson_copy.pop("exercises", None)
         result.append(lesson_copy)
     
@@ -703,7 +785,6 @@ async def get_lesson(language_id: str, lesson_id: str):
 
 @api_router.post("/progress/complete")
 async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current_user)):
-    # Find the lesson
     if answer.language not in LESSONS_CACHE:
         raise HTTPException(status_code=404, detail="Language not found")
     
@@ -716,7 +797,7 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
     
-    # Calculate score
+    # Calculate score with enhanced validation
     exercises = lesson.get("exercises", [])
     correct = 0
     for i, ex in enumerate(exercises):
@@ -725,10 +806,13 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             if ex["type"] == "multiple_choice" and user_answer.get("selected") == ex.get("correct"):
                 correct += 1
             elif ex["type"] == "code":
-                # Simple validation - check if answer contains key parts
-                user_code = user_answer.get("code", "").strip().lower()
-                solution = ex.get("solution", "").strip().lower()
-                if user_code and (user_code in solution or solution in user_code or len(user_code) > 5):
+                is_correct, _ = validate_code(
+                    user_answer.get("code", ""),
+                    ex.get("solution", ""),
+                    answer.language,
+                    ex["type"]
+                )
+                if is_correct:
                     correct += 1
             elif ex["type"] == "fill_blank":
                 user_fill = user_answer.get("answer", "").strip().lower()
@@ -738,25 +822,36 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
     
     total = len(exercises)
     score = int((correct / total) * 100) if total > 0 else 100
-    xp_earned = lesson.get("xp", 10)
+    base_xp = lesson.get("xp", 15)
     
-    # Reduce XP for incorrect answers
-    if score < 100:
-        xp_earned = int(xp_earned * (score / 100))
+    # Calculate XP with combo multiplier
+    combo_multiplier = user.get("combo_multiplier", 1.0)
+    if score == 100:
+        combo_multiplier = min(combo_multiplier + 0.5, 5.0)  # Max 5x
+    elif score < 70:
+        combo_multiplier = 1.0  # Reset on poor performance
     
-    # Update hearts if wrong answers
-    hearts_lost = total - correct
+    xp_earned = int(base_xp * (score / 100) * combo_multiplier)
+    
+    # Speed bonus
+    if answer.time_taken and answer.time_taken < 120 and score >= 70:
+        xp_earned = int(xp_earned * 1.25)  # 25% speed bonus
+    
+    # Update hearts
+    hearts_lost = max(0, (total - correct) // 2)  # Lose heart for every 2 wrong
     new_hearts = max(0, user.get("hearts", 5) - hearts_lost)
     
-    # Check if already completed
+    # Check existing progress
     existing = await db.progress.find_one({
         "user_id": user["id"],
         "language": answer.language,
         "lesson_id": answer.lesson_id
     })
     
+    new_badges = []
+    gems_earned = 0
+    
     if not existing:
-        # First time completing
         await db.progress.insert_one({
             "user_id": user["id"],
             "language": answer.language,
@@ -766,46 +861,96 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             "completed_at": datetime.utcnow().isoformat()
         })
         
-        # Update user XP and level
         new_xp = user.get("xp", 0) + xp_earned
-        new_level = 1 + (new_xp // 100)  # Level up every 100 XP
+        new_level = 1 + (new_xp // 100)
+        daily_xp = user.get("daily_xp", 0) + xp_earned
+        total_lessons = user.get("total_lessons_completed", 0) + 1
+        perfect_lessons = user.get("perfect_lessons", 0) + (1 if score == 100 else 0)
         
-        # Update languages studied
         languages_studied = user.get("languages_studied", [])
         if answer.language not in languages_studied:
             languages_studied.append(answer.language)
         
-        # Check for badges
         badges = user.get("badges", [])
         
-        # First lesson badge
+        # Check badges
         if "first_lesson" not in badges:
             badges.append("first_lesson")
+            new_badges.append("first_lesson")
+            gems_earned += 5
         
-        # Perfect lesson badge
         if score == 100 and "perfect_lesson" not in badges:
             badges.append("perfect_lesson")
+            new_badges.append("perfect_lesson")
         
-        # XP badges
+        if perfect_lessons >= 5 and "no_mistakes" not in badges:
+            badges.append("no_mistakes")
+            new_badges.append("no_mistakes")
+            gems_earned += 10
+        
         if new_xp >= 100 and "xp_100" not in badges:
             badges.append("xp_100")
+            new_badges.append("xp_100")
         if new_xp >= 500 and "xp_500" not in badges:
             badges.append("xp_500")
+            new_badges.append("xp_500")
         if new_xp >= 1000 and "xp_1000" not in badges:
             badges.append("xp_1000")
+            new_badges.append("xp_1000")
+        if new_xp >= 5000 and "xp_5000" not in badges:
+            badges.append("xp_5000")
+            new_badges.append("xp_5000")
+            gems_earned += 25
         
-        # Polyglot badge
         if len(languages_studied) >= 3 and "polyglot" not in badges:
             badges.append("polyglot")
+            new_badges.append("polyglot")
+        if len(languages_studied) >= 5 and "polyglot_master" not in badges:
+            badges.append("polyglot_master")
+            new_badges.append("polyglot_master")
+            gems_earned += 15
         
-        # Streak badges
+        if combo_multiplier >= 5.0 and "combo_king" not in badges:
+            badges.append("combo_king")
+            new_badges.append("combo_king")
+            gems_earned += 10
+        
+        if answer.time_taken and answer.time_taken < 120 and score >= 80 and "speed_demon" not in badges:
+            badges.append("speed_demon")
+            new_badges.append("speed_demon")
+        
+        if total_lessons >= 50 and "lesson_master" not in badges:
+            badges.append("lesson_master")
+            new_badges.append("lesson_master")
+        if total_lessons >= 100 and "lesson_legend" not in badges:
+            badges.append("lesson_legend")
+            new_badges.append("lesson_legend")
+            gems_earned += 20
+        
         streak = user.get("streak", 0)
         if streak >= 3 and "streak_3" not in badges:
             badges.append("streak_3")
+            new_badges.append("streak_3")
         if streak >= 7 and "streak_7" not in badges:
             badges.append("streak_7")
+            new_badges.append("streak_7")
         if streak >= 30 and "streak_30" not in badges:
             badges.append("streak_30")
+            new_badges.append("streak_30")
+        
+        # Check daily goal
+        daily_goal = user.get("daily_goal", 50)
+        daily_goal_met = daily_xp >= daily_goal
+        daily_goal_streak = user.get("daily_goal_streak", 0)
+        if daily_goal_met:
+            daily_goal_streak += 1
+            gems_earned += 2
+        
+        if daily_goal_streak >= 7 and "daily_achiever" not in badges:
+            badges.append("daily_achiever")
+            new_badges.append("daily_achiever")
+        
+        new_gems = user.get("gems", 0) + gems_earned
         
         await db.users.update_one(
             {"id": user["id"]},
@@ -813,8 +958,14 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
                 "xp": new_xp,
                 "level": new_level,
                 "hearts": new_hearts,
+                "gems": new_gems,
                 "badges": badges,
                 "languages_studied": languages_studied,
+                "daily_xp": daily_xp,
+                "daily_goal_streak": daily_goal_streak,
+                "combo_multiplier": combo_multiplier,
+                "total_lessons_completed": total_lessons,
+                "perfect_lessons": perfect_lessons,
                 "last_activity": datetime.utcnow().isoformat()
             }}
         )
@@ -825,12 +976,17 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             "new_xp": new_xp,
             "new_level": new_level,
             "hearts": new_hearts,
-            "new_badges": badges,
+            "gems": new_gems,
+            "gems_earned": gems_earned,
+            "combo_multiplier": combo_multiplier,
+            "new_badges": new_badges,
             "correct": correct,
-            "total": total
+            "total": total,
+            "daily_xp": daily_xp,
+            "daily_goal": daily_goal,
+            "daily_goal_met": daily_goal_met,
         }
     else:
-        # Already completed, just update score if better
         if score > existing.get("score", 0):
             await db.progress.update_one(
                 {"_id": existing["_id"]},
@@ -839,14 +995,19 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
         
         return {
             "score": score,
-            "xp_earned": 0,  # No XP for repeat
+            "xp_earned": 0,
             "new_xp": user.get("xp", 0),
             "new_level": user.get("level", 1),
             "hearts": new_hearts,
-            "new_badges": user.get("badges", []),
+            "gems": user.get("gems", 0),
+            "gems_earned": 0,
+            "combo_multiplier": combo_multiplier,
+            "new_badges": [],
             "correct": correct,
             "total": total,
-            "already_completed": True
+            "already_completed": True,
+            "daily_xp": user.get("daily_xp", 0),
+            "daily_goal": user.get("daily_goal", 50),
         }
 
 @api_router.get("/progress/{language_id}")
@@ -855,7 +1016,6 @@ async def get_language_progress(language_id: str, request: Request):
     completed = 0
     progress_list = []
     
-    # Try to get user for progress tracking
     auth_header = request.headers.get("authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
@@ -867,11 +1027,9 @@ async def get_language_progress(language_id: str, request: Request):
                     "user_id": user["id"],
                     "language": language_id
                 }).to_list(1000)
-                # Remove MongoDB ObjectId to make it JSON serializable
-                progress_list = []
                 for p in progress:
                     p_dict = dict(p)
-                    p_dict.pop("_id", None)  # Remove ObjectId
+                    p_dict.pop("_id", None)
                     progress_list.append(p_dict)
                 completed = len([p for p in progress if p.get("completed")])
     
@@ -880,6 +1038,70 @@ async def get_language_progress(language_id: str, request: Request):
         "completed_lessons": completed,
         "progress_percent": int((completed / total_lessons) * 100) if total_lessons > 0 else 0,
         "lessons": progress_list
+    }
+
+# ============== DAILY CHALLENGE ROUTES ==============
+
+@api_router.get("/daily-challenge")
+async def get_daily_challenge(user: dict = Depends(get_current_user)):
+    challenge = generate_daily_challenge()
+    completed_today = challenge["id"] in user.get("daily_challenges_completed", [])
+    challenge["completed"] = completed_today
+    return challenge
+
+@api_router.post("/daily-challenge/complete")
+async def complete_daily_challenge(answer: DailyChallengeAnswer, user: dict = Depends(get_current_user)):
+    challenge = generate_daily_challenge()
+    
+    if challenge["id"] in user.get("daily_challenges_completed", []):
+        raise HTTPException(status_code=400, detail="Already completed today's challenge")
+    
+    # Calculate score
+    exercises = challenge["exercises"]
+    correct = 0
+    for i, ex in enumerate(exercises):
+        if i < len(answer.answers):
+            user_answer = answer.answers[i]
+            if ex["type"] == "multiple_choice" and user_answer.get("selected") == ex.get("correct"):
+                correct += 1
+            elif ex["type"] == "code":
+                is_correct, _ = validate_code(user_answer.get("code", ""), ex.get("solution", ""), "python", "code")
+                if is_correct:
+                    correct += 1
+            elif ex["type"] == "fill_blank":
+                if user_answer.get("answer", "").strip().lower() == ex.get("answer", "").strip().lower():
+                    correct += 1
+    
+    total = len(exercises)
+    score = int((correct / total) * 100) if total > 0 else 0
+    
+    xp_earned = 0
+    gems_earned = 0
+    
+    if score >= 70:
+        xp_earned = challenge["xp_reward"]
+        gems_earned = challenge["gem_reward"]
+        
+        completed_challenges = user.get("daily_challenges_completed", [])
+        completed_challenges.append(challenge["id"])
+        
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {
+                "xp": user.get("xp", 0) + xp_earned,
+                "gems": user.get("gems", 0) + gems_earned,
+                "daily_xp": user.get("daily_xp", 0) + xp_earned,
+                "daily_challenges_completed": completed_challenges,
+            }}
+        )
+    
+    return {
+        "score": score,
+        "correct": correct,
+        "total": total,
+        "xp_earned": xp_earned,
+        "gems_earned": gems_earned,
+        "passed": score >= 70,
     }
 
 # ============== SOCIAL ROUTES ==============
@@ -907,28 +1129,16 @@ async def add_friend(request: FriendRequest, user: dict = Depends(get_current_us
     if friend["id"] == user["id"]:
         raise HTTPException(status_code=400, detail="Cannot add yourself")
     
-    # Check if already friends
     if friend["id"] in user.get("friends", []):
         raise HTTPException(status_code=400, detail="Already friends")
     
-    # Add to friends list (mutual)
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$addToSet": {"friends": friend["id"]}}
-    )
-    await db.users.update_one(
-        {"id": friend["id"]},
-        {"$addToSet": {"friends": user["id"]}}
-    )
+    await db.users.update_one({"id": user["id"]}, {"$addToSet": {"friends": friend["id"]}})
+    await db.users.update_one({"id": friend["id"]}, {"$addToSet": {"friends": user["id"]}})
     
-    # Check for social badge
     updated_user = await db.users.find_one({"id": user["id"]})
     friends_count = len(updated_user.get("friends", []))
     if friends_count >= 5 and "social_butterfly" not in updated_user.get("badges", []):
-        await db.users.update_one(
-            {"id": user["id"]},
-            {"$addToSet": {"badges": "social_butterfly"}}
-        )
+        await db.users.update_one({"id": user["id"]}, {"$addToSet": {"badges": "social_butterfly"}})
     
     return {"message": f"Added {request.friend_username} as friend"}
 
@@ -953,13 +1163,46 @@ async def get_friends(user: dict = Depends(get_current_user)):
 async def get_badges():
     return BADGES
 
+# ============== SHOP/GEMS ROUTES ==============
+
+@api_router.post("/shop/buy-hearts")
+async def buy_hearts(user: dict = Depends(get_current_user)):
+    gem_cost = 10
+    if user.get("gems", 0) < gem_cost:
+        raise HTTPException(status_code=400, detail="Not enough gems")
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "hearts": user.get("max_hearts", 5),
+            "gems": user.get("gems", 0) - gem_cost
+        }}
+    )
+    return {"message": "Hearts refilled!", "hearts": user.get("max_hearts", 5)}
+
+@api_router.post("/shop/buy-streak-freeze")
+async def buy_streak_freeze(user: dict = Depends(get_current_user)):
+    gem_cost = 20
+    if user.get("gems", 0) < gem_cost:
+        raise HTTPException(status_code=400, detail="Not enough gems")
+    
+    streak_freezes = user.get("streak_freezes", 0) + 1
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "streak_freezes": streak_freezes,
+            "gems": user.get("gems", 0) - gem_cost
+        }}
+    )
+    return {"message": "Streak freeze purchased!", "streak_freezes": streak_freezes}
+
 # ============== ROOT ROUTE ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "Codero API - Learn to code!"}
+    return {"message": "Codero API v2 - Learn to code with enhanced features!"}
 
-# Include the router in the main app
+# Include router
 app.include_router(api_router)
 
 app.add_middleware(
@@ -970,11 +1213,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")

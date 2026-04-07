@@ -112,8 +112,14 @@ export default function HomeScreen() {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/daily-challenge')}>
             <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.actionGradient}>
+              <Ionicons name="flash" size={24} color="#0D0D0D" />
+            </LinearGradient>
+            <Text style={styles.actionText}>DAILY</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
+            <LinearGradient colors={['#00BFFF', '#0080FF']} style={styles.actionGradient}>
               <Ionicons name="podium" size={24} color="#0D0D0D" />
             </LinearGradient>
             <Text style={styles.actionText}>RANKS</Text>
