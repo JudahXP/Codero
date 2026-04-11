@@ -19,7 +19,9 @@ interface Lesson {
   description: string;
   xp: number;
   unit: number;
+  unit_name?: string;
   completed: boolean;
+  has_practice?: boolean;
 }
 
 interface Progress {
@@ -155,50 +157,61 @@ export default function LanguageScreen() {
                   const actuallyLocked = isFirst ? !prevUnitCompleted && Number(unit) > 1 : isLocked;
 
                   return (
-                    <TouchableOpacity
-                      key={lesson.id}
-                      style={[
-                        styles.lessonCard,
-                        lesson.completed && styles.lessonCompleted,
-                        actuallyLocked && styles.lessonLocked,
-                      ]}
-                      onPress={() => {
-                        if (!actuallyLocked) {
-                          router.push(`/lesson/${id}/${lesson.id}`);
-                        }
-                      }}
-                      activeOpacity={actuallyLocked ? 1 : 0.7}
-                    >
-                      <View style={styles.lessonLeft}>
-                        {lesson.completed ? (
-                          <View style={[styles.lessonIcon, { backgroundColor: `${color}30` }]}>
-                            <Ionicons name="checkmark" size={20} color={color} />
+                    <View key={lesson.id} style={styles.lessonRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.lessonCard,
+                          lesson.completed && styles.lessonCompleted,
+                          actuallyLocked && styles.lessonLocked,
+                        ]}
+                        onPress={() => {
+                          if (!actuallyLocked) {
+                            router.push(`/lesson/${id}/${lesson.id}`);
+                          }
+                        }}
+                        activeOpacity={actuallyLocked ? 1 : 0.7}
+                      >
+                        <View style={styles.lessonLeft}>
+                          {lesson.completed ? (
+                            <View style={[styles.lessonIcon, { backgroundColor: `${color}30` }]}>
+                              <Ionicons name="checkmark" size={20} color={color} />
+                            </View>
+                          ) : actuallyLocked ? (
+                            <View style={[styles.lessonIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                              <Ionicons name="lock-closed" size={20} color="#666" />
+                            </View>
+                          ) : (
+                            <View style={[styles.lessonIcon, { backgroundColor: `${color}20` }]}>
+                              <Ionicons name="play" size={20} color={color} />
+                            </View>
+                          )}
+                          <View style={styles.lessonInfo}>
+                            <Text style={[
+                              styles.lessonTitle,
+                              actuallyLocked && styles.lessonTitleLocked
+                            ]}>
+                              {lesson.title.toUpperCase()}
+                            </Text>
+                            <Text style={styles.lessonXp}>+{lesson.xp} XP</Text>
                           </View>
-                        ) : actuallyLocked ? (
-                          <View style={[styles.lessonIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                            <Ionicons name="lock-closed" size={20} color="#666" />
-                          </View>
-                        ) : (
-                          <View style={[styles.lessonIcon, { backgroundColor: `${color}20` }]}>
-                            <Ionicons name="play" size={20} color={color} />
-                          </View>
-                        )}
-                        <View style={styles.lessonInfo}>
-                          <Text style={[
-                            styles.lessonTitle,
-                            actuallyLocked && styles.lessonTitleLocked
-                          ]}>
-                            {lesson.title.toUpperCase()}
-                          </Text>
-                          <Text style={styles.lessonXp}>+{lesson.xp} XP</Text>
                         </View>
-                      </View>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={20}
-                        color={actuallyLocked ? '#444' : '#00FF88'}
-                      />
-                    </TouchableOpacity>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={20}
+                          color={actuallyLocked ? '#444' : '#00FF88'}
+                        />
+                      </TouchableOpacity>
+                      {!actuallyLocked && (
+                        <TouchableOpacity
+                          style={styles.practiceButton}
+                          onPress={() => router.push(`/practice/${id}/${lesson.id}`)}
+                        >
+                          <Ionicons name="school" size={16} color="#00BFFF" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
                   );
                 })}
               </View>
@@ -319,7 +332,13 @@ const styles = StyleSheet.create({
   lessonsGrid: {
     gap: 10,
   },
+  lessonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   lessonCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -328,6 +347,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 136, 0.2)',
+  },
+  practiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 191, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 191, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   lessonCompleted: {
     borderColor: 'rgba(0, 255, 136, 0.5)',

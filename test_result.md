@@ -189,6 +189,51 @@ backend:
         agent: "testing"
         comment: "Enhanced badges system with 20 badges including new ones: combo_king, daily_achiever, lesson_master, no_mistakes. All badges properly configured with XP rewards and descriptions."
 
+  - task: "VIP Subscription System"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "VIP endpoints added: GET /vip/info, GET /vip/status, POST /vip/subscribe. Mock payment flow. VIP perks include 1.5x XP, 10 hearts, 5 hints/lesson, streak freezes. Need testing."
+      - working: true
+        agent: "testing"
+        comment: "VIP subscription system fully functional. All endpoints working: GET /vip/info returns price ($5) and 8 perks, GET /vip/status correctly shows VIP status before/after subscription, POST /vip/subscribe activates VIP with mock payment. VIP perks properly applied (1.5x XP multiplier, 10 max hearts, 5 hints per lesson, etc.)."
+
+  - task: "Practice Mode Endpoints"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Practice mode added via practice_mode=true in /progress/complete. GET /languages/{id}/lessons/{id}/practice returns practice content. No hearts lost, no XP gained in practice mode. Need testing."
+      - working: true
+        agent: "testing"
+        comment: "Practice mode endpoints working perfectly. GET /languages/python/lessons/python_1_1/practice returns detailed practice content with explanation, syntax, and examples. POST /progress/complete with practice_mode=true correctly processes practice sessions with XP=0, hearts_lost=0, and tracks practice_sessions count."
+
+  - task: "Login Endpoint Fix (ObjectId Bug)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed login endpoint that was doing $set with full user dict including MongoDB _id ObjectId. Now uses specific field updates only. Need testing."
+      - working: true
+        agent: "testing"
+        comment: "Login endpoint ObjectId bug successfully fixed. POST /auth/login now works correctly without MongoDB ObjectId serialization errors. Users can login and receive proper token and user data response."
+
 frontend:
   - task: "Frontend Testing"
     implemented: false
@@ -209,8 +254,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Enhanced Codero backend fully tested and working"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -218,3 +262,7 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "Enhanced Codero backend API testing completed successfully. 10/10 tests passed (100% success rate). All enhanced features working perfectly: 20 languages (including Zig, Elixir, Shell, Haskell), 30 lessons per language with 10 exercises each, gems system (starting 10 gems), enhanced gamification with combo multipliers (1.0-5.0x), daily challenge system, shop system (hearts 10 gems, streak freeze 20 gems), settings API, and 20 badges system. All endpoints functional and ready for production use."
+  - agent: "main"
+    message: "Added VIP subscription system (mock payment), Practice mode endpoints, and fixed login endpoint ObjectId bug. Need testing for: 1) VIP flow: GET /vip/info, GET /vip/status, POST /vip/subscribe  2) Practice mode: GET /languages/{id}/lessons/{id}/practice, POST /progress/complete with practice_mode=true 3) Login fix: POST /auth/login should work without MongoDB _id errors 4) Full lesson completion: POST /progress/complete with all answer types. Test credentials: email=test1@codero.com password=test123. Register a fresh user for testing."
+  - agent: "testing"
+    message: "Comprehensive backend API testing completed successfully. All 10 tests passed (100% success rate). VIP subscription system fully functional with proper payment flow, status tracking, and perk application. Practice mode endpoints working correctly with detailed content and proper XP/hearts handling. Login ObjectId bug successfully fixed. All lesson completion flows (normal and practice mode) working perfectly. Backend API is production-ready."

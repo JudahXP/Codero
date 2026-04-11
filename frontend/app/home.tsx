@@ -124,17 +124,17 @@ export default function HomeScreen() {
             </LinearGradient>
             <Text style={styles.actionText}>RANKS</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/friends')}>
-            <LinearGradient colors={['#00FF88', '#00CC6A']} style={styles.actionGradient}>
-              <Ionicons name="people" size={24} color="#0D0D0D" />
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/vip')}>
+            <LinearGradient colors={['#FFD700', '#FF8C00']} style={styles.actionGradient}>
+              <Ionicons name="star" size={24} color="#0D0D0D" />
             </LinearGradient>
-            <Text style={styles.actionText}>FRIENDS</Text>
+            <Text style={styles.actionText}>VIP</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/badges')}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/settings')}>
             <LinearGradient colors={['#FF6B6B', '#FF4757']} style={styles.actionGradient}>
-              <Ionicons name="medal" size={24} color="#0D0D0D" />
+              <Ionicons name="settings" size={24} color="#0D0D0D" />
             </LinearGradient>
-            <Text style={styles.actionText}>BADGES</Text>
+            <Text style={styles.actionText}>SETTINGS</Text>
           </TouchableOpacity>
         </View>
 
