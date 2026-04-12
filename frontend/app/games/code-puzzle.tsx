@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import * as Haptics from 'expo-haptics';
 
 export default function CodePuzzleScreen() {
   const router = useRouter();
@@ -31,6 +33,19 @@ export default function CodePuzzleScreen() {
   const [gameOver, setGameOver] = useState(false);
   const [gameResults, setGameResults] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleExit = useCallback(() => {
+    if (gameOver) { router.back(); return; }
+    Alert.alert('QUIT GAME?', 'Your progress will be lost!', [
+      { text: 'KEEP PLAYING', style: 'cancel' },
+      { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+    ]);
+  }, [gameOver, router]);
+
+  useEffect(() => {
+    const bh = BackHandler.addEventListener('hardwareBackPress', () => { handleExit(); return true; });
+    return () => bh.remove();
+  }, [handleExit]);
 
   useEffect(() => { fetchPuzzles(); }, [language]);
 
@@ -79,7 +94,12 @@ export default function CodePuzzleScreen() {
       });
       setResult(res.data);
       setChecked(true);
-      if (res.data.correct) setScore(s => s + 1);
+      if (res.data.correct) {
+        setScore(s => s + 1);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } catch (e) {
       Alert.alert('ERROR', 'Check failed');
     }
@@ -164,7 +184,7 @@ export default function CodePuzzleScreen() {
     <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleExit}>
             <Ionicons name="close" size={24} color="#00BFFF" />
           </TouchableOpacity>
           <View style={styles.progressBar}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  BackHandler,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import * as Haptics from 'expo-haptics';
 
 export default function SpeedCodeScreen() {
   const router = useRouter();
@@ -38,6 +40,26 @@ export default function SpeedCodeScreen() {
   const [started, setStarted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<TextInput>(null);
+
+  const handleExit = useCallback(() => {
+    if (gameOver || !started) { router.back(); return; }
+    if (timerRef.current) clearInterval(timerRef.current);
+    Alert.alert('QUIT GAME?', 'Your progress will be lost!', [
+      { text: 'KEEP PLAYING', style: 'cancel', onPress: () => {
+        if (!checked && timeLeft > 0) {
+          timerRef.current = setInterval(() => {
+            setTimeLeft(t => { if (t <= 1) { clearInterval(timerRef.current!); return 0; } return t - 1; });
+          }, 1000);
+        }
+      }},
+      { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+    ]);
+  }, [gameOver, started, router, checked, timeLeft]);
+
+  useEffect(() => {
+    const bh = BackHandler.addEventListener('hardwareBackPress', () => { handleExit(); return true; });
+    return () => bh.remove();
+  }, [handleExit]);
 
   useEffect(() => { fetchChallenges(); }, [language]);
 
@@ -99,6 +121,9 @@ export default function SpeedCodeScreen() {
       if (res.data.correct) {
         setTotalPoints(p => p + res.data.points);
         setCorrectCount(c => c + 1);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (e) {
       Alert.alert('ERROR', 'Check failed');
@@ -220,7 +245,7 @@ export default function SpeedCodeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={styles.header}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleExit}>
               <Ionicons name="close" size={24} color="#FFD700" />
             </TouchableOpacity>
             <View style={styles.timerContainer}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import * as Haptics from 'expo-haptics';
 
 interface Challenge {
   id: string;
@@ -38,6 +40,30 @@ export default function BugHunterScreen() {
   const [gameOver, setGameOver] = useState(false);
   const [gameResults, setGameResults] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Exit confirmation - back handler
+  const handleExit = useCallback(() => {
+    if (gameOver) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      'QUIT GAME?',
+      'Your progress will be lost!',
+      [
+        { text: 'KEEP PLAYING', style: 'cancel' },
+        { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+      ]
+    );
+  }, [gameOver, router]);
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleExit();
+      return true;
+    });
+    return () => backHandler.remove();
+  }, [handleExit]);
 
   useEffect(() => {
     fetchChallenges();
@@ -67,7 +93,12 @@ export default function BugHunterScreen() {
       });
       setResult(res.data);
       setChecked(true);
-      if (res.data.correct) setScore(s => s + 1);
+      if (res.data.correct) {
+        setScore(s => s + 1);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } catch (e) {
       Alert.alert('ERROR', 'Check failed');
     }
@@ -161,7 +192,7 @@ export default function BugHunterScreen() {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleExit}>
             <Ionicons name="close" size={24} color="#FF6B6B" />
           </TouchableOpacity>
           <View style={styles.progressBar}>
@@ -204,7 +235,12 @@ export default function BugHunterScreen() {
                 <TouchableOpacity
                   key={i}
                   style={[styles.optionButton, { borderColor: borderCol, backgroundColor: bgCol }]}
-                  onPress={() => !checked && setSelected(i)}
+                  onPress={() => {
+                    if (!checked) {
+                      setSelected(i);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
                   disabled={checked}
                 >
                   <Text style={styles.optionText}>{opt}</Text>
