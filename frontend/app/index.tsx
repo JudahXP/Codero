@@ -1,16 +1,19 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     if (!loading && user) {
@@ -18,9 +21,26 @@ export default function WelcomeScreen() {
     }
   }, [user, loading]);
 
+  useEffect(() => {
+    // Pulse animation for logo
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Fade-in content
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
+        <Ionicons name="code-slash" size={40} color="#00FF88" />
         <Text style={styles.loadingText}>LOADING...</Text>
       </View>
     );
@@ -29,36 +49,72 @@ export default function WelcomeScreen() {
   return (
     <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           {/* Logo Section */}
           <View style={styles.logoSection}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="code-slash" size={60} color="#00FF88" />
-            </View>
+            <Animated.View style={[styles.logoContainer, { transform: [{ scale: pulseAnim }] }]}>
+              <Ionicons name="code-slash" size={56} color="#00FF88" />
+            </Animated.View>
             <Text style={styles.title}>CODERO</Text>
             <Text style={styles.subtitle}>LEARN TO CODE</Text>
-            <Text style={styles.tagline}>LEVEL UP YOUR SKILLS</Text>
+            <Text style={styles.tagline}>THE FUN WAY TO MASTER PROGRAMMING</Text>
           </View>
 
-          {/* Features */}
-          <View style={styles.featuresContainer}>
+          {/* Features Grid */}
+          <Animated.View style={[styles.featuresContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.featureRow}>
-              <View style={styles.featureBadge}>
-                <Ionicons name="game-controller" size={20} color="#00FF88" />
+              <View style={styles.featureCard}>
+                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(0, 255, 136, 0.12)' }]}>
+                  <Ionicons name="globe" size={22} color="#00FF88" />
+                </View>
+                <Text style={styles.featureTitle}>20 LANGUAGES</Text>
+                <Text style={styles.featureDesc}>PYTHON, JS, GO, RUST, ZIG & MORE</Text>
               </View>
-              <Text style={styles.featureText}>16 LANGUAGES</Text>
+              <View style={styles.featureCard}>
+                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(255, 215, 0, 0.12)' }]}>
+                  <Ionicons name="trophy" size={22} color="#FFD700" />
+                </View>
+                <Text style={styles.featureTitle}>EARN XP</Text>
+                <Text style={styles.featureDesc}>LEVEL UP & UNLOCK BADGES</Text>
+              </View>
             </View>
             <View style={styles.featureRow}>
-              <View style={styles.featureBadge}>
-                <Ionicons name="trophy" size={20} color="#FFD700" />
+              <View style={styles.featureCard}>
+                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(255, 107, 107, 0.12)' }]}>
+                  <Ionicons name="game-controller" size={22} color="#FF6B6B" />
+                </View>
+                <Text style={styles.featureTitle}>PLAY GAMES</Text>
+                <Text style={styles.featureDesc}>BUG HUNTER, PUZZLES & MORE</Text>
               </View>
-              <Text style={styles.featureText}>EARN XP & BADGES</Text>
+              <View style={styles.featureCard}>
+                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(0, 191, 255, 0.12)' }]}>
+                  <Ionicons name="flame" size={22} color="#00BFFF" />
+                </View>
+                <Text style={styles.featureTitle}>STREAKS</Text>
+                <Text style={styles.featureDesc}>DAILY GOALS & CHALLENGES</Text>
+              </View>
             </View>
-            <View style={styles.featureRow}>
-              <View style={styles.featureBadge}>
-                <Ionicons name="flame" size={20} color="#FF6B6B" />
-              </View>
-              <Text style={styles.featureText}>DAILY STREAKS</Text>
+          </Animated.View>
+
+          {/* Stats Highlight */}
+          <View style={styles.statsRow}>
+            <View style={styles.statBubble}>
+              <Text style={styles.statNumber}>600+</Text>
+              <Text style={styles.statLabel}>LESSONS</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBubble}>
+              <Text style={styles.statNumber}>3</Text>
+              <Text style={styles.statLabel}>GAMES</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBubble}>
+              <Text style={styles.statNumber}>20+</Text>
+              <Text style={styles.statLabel}>BADGES</Text>
             </View>
           </View>
 
@@ -75,8 +131,8 @@ export default function WelcomeScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Ionicons name="play" size={24} color="#0D0D0D" />
-                <Text style={styles.playButtonText}>START</Text>
+                <Ionicons name="rocket" size={22} color="#0D0D0D" />
+                <Text style={styles.playButtonText}>GET STARTED</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -85,10 +141,13 @@ export default function WelcomeScreen() {
               onPress={() => router.push('/login')}
               activeOpacity={0.8}
             >
-              <Text style={styles.loginButtonText}>ALREADY HAVE ACCOUNT</Text>
+              <Ionicons name="log-in" size={18} color="#00FF88" />
+              <Text style={styles.loginButtonText}>I HAVE AN ACCOUNT</Text>
             </TouchableOpacity>
           </View>
-        </View>
+
+          <Text style={styles.footerText}>FREE TO START - NO CREDIT CARD NEEDED</Text>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -101,84 +160,136 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#0D0D0D',
+    gap: 16,
   },
   loadingText: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 14,
+    fontSize: 12,
     color: '#00FF88',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-    paddingVertical: 40,
   },
   logoSection: {
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 16,
+    marginBottom: 24,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: 24,
     backgroundColor: 'rgba(0, 255, 136, 0.1)',
     borderWidth: 3,
     borderColor: '#00FF88',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 32,
+    fontSize: 28,
     color: '#00FF88',
     textShadowColor: '#00FF88',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   subtitle: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 12,
+    fontSize: 11,
     color: '#FFFFFF',
     marginBottom: 8,
   },
   tagline: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
+    fontSize: 7,
     color: '#888888',
+    textAlign: 'center',
+    lineHeight: 14,
   },
   featuresContainer: {
-    gap: 16,
-    paddingVertical: 20,
+    gap: 10,
+    marginBottom: 20,
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    gap: 10,
   },
-  featureBadge: {
+  featureCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureIconBg: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  featureText: {
+  featureTitle: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 10,
+    fontSize: 8,
     color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  featureDesc: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 5,
+    color: '#888888',
+    textAlign: 'center',
+    lineHeight: 10,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 136, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.1)',
+    marginBottom: 24,
+  },
+  statBubble: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statNumber: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 14,
+    color: '#00FF88',
+  },
+  statLabel: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 6,
+    color: '#888888',
+  },
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(0, 255, 136, 0.2)',
   },
   buttonContainer: {
-    gap: 16,
+    gap: 12,
+    marginBottom: 16,
   },
   playButton: {
     borderRadius: 16,
@@ -198,7 +309,7 @@ const styles = StyleSheet.create({
   },
   playButtonText: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 16,
+    fontSize: 13,
     color: '#0D0D0D',
   },
   loginButton: {
@@ -207,11 +318,20 @@ const styles = StyleSheet.create({
     borderColor: '#00FF88',
     borderRadius: 16,
     paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
   loginButtonText: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 10,
+    fontSize: 9,
     color: '#00FF88',
+  },
+  footerText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 6,
+    color: '#555555',
+    textAlign: 'center',
   },
 });

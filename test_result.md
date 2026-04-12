@@ -253,6 +253,39 @@ metadata:
   test_sequence: 2
   run_ui: false
 
+  - task: "Coding Games Backend Endpoints"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Games endpoints added: GET /games/bug-hunter/{language}, POST /games/bug-hunter/{language}/check, GET /games/code-puzzle/{language}, POST /games/code-puzzle/{language}/check, GET /games/speed-code/{language}, POST /games/speed-code/{language}/check, POST /games/complete, GET /games/stats. Need testing."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive games backend testing completed successfully. All 8 endpoints working perfectly: Bug Hunter (GET/POST), Code Puzzle (GET/POST), Speed Code (GET/POST), Game Complete, and Game Stats. Tested with Python and JavaScript languages. Security verified (no answer exposure), proper authentication, XP/gems calculations correct, game statistics tracking functional. All game types properly implemented with challenge data."
+
+  - task: "Start Screen & Games Navigation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated start screen with 20 languages, games features, stats row, better buttons. Added GAMES quick action to home screen. Verified via screenshots: start screen loads correctly, buttons navigate to login/register, home GAMES button navigates to games hub, Bug Hunter game loads and is playable."
+
+metadata:
+  created_by: "testing_agent"
+  version: "3.0"
+  test_sequence: 3
+  run_ui: false
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -266,3 +299,7 @@ agent_communication:
     message: "Added VIP subscription system (mock payment), Practice mode endpoints, and fixed login endpoint ObjectId bug. Need testing for: 1) VIP flow: GET /vip/info, GET /vip/status, POST /vip/subscribe  2) Practice mode: GET /languages/{id}/lessons/{id}/practice, POST /progress/complete with practice_mode=true 3) Login fix: POST /auth/login should work without MongoDB _id errors 4) Full lesson completion: POST /progress/complete with all answer types. Test credentials: email=test1@codero.com password=test123. Register a fresh user for testing."
   - agent: "testing"
     message: "Comprehensive backend API testing completed successfully. All 10 tests passed (100% success rate). VIP subscription system fully functional with proper payment flow, status tracking, and perk application. Practice mode endpoints working correctly with detailed content and proper XP/hearts handling. Login ObjectId bug successfully fixed. All lesson completion flows (normal and practice mode) working perfectly. Backend API is production-ready."
+  - agent: "main"
+    message: "Updated start screen with better info (20 languages, games, stats), added GAMES button to home screen quick actions. Now need to test the games backend endpoints: GET /games/bug-hunter/{language}, POST /games/bug-hunter/{language}/check, GET /games/code-puzzle/{language}, POST /games/code-puzzle/{language}/check, GET /games/speed-code/{language}, POST /games/speed-code/{language}/check, POST /games/complete, GET /games/stats. Test credentials: Register a fresh user (email: gametest@codero.com, password: test123, username: gametester)."
+  - agent: "testing"
+    message: "Codero Games backend API testing completed successfully. All 8/8 tests passed (100% success rate). Comprehensive testing of all game endpoints: Bug Hunter (GET/POST), Code Puzzle (GET/POST), Speed Code (GET/POST), Game Complete, and Game Stats. All endpoints working perfectly with proper security (no answer exposure), authentication, XP/gems calculations, and game statistics tracking. Tested with multiple languages (Python, JavaScript). All game types properly implemented with comprehensive challenge data. Backend games API is production-ready."

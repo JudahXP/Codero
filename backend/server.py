@@ -1368,11 +1368,227 @@ async def buy_streak_freeze(user: dict = Depends(get_current_user)):
     )
     return {"message": "Streak freeze purchased!", "streak_freezes": streak_freezes}
 
+# ============== CODING GAMES ==============
+
+class GameComplete(BaseModel):
+    game_type: str  # bug_hunter, code_puzzle, speed_code
+    score: int
+    total: int
+    time_taken: Optional[int] = None
+    language: str = "python"
+
+BUG_HUNTER_CHALLENGES = {
+    "python": [
+        {"id": "py_bug_1", "code": "prnt('Hello World')", "bug_line": 1, "question": "Find the bug in this Python code:", "options": ["prnt should be print", "Missing semicolon", "Wrong quotes", "Missing import"], "correct": 0, "fixed_code": "print('Hello World')", "explanation": "Python's print function is spelled 'print', not 'prnt'. Typos are the most common bug!", "concept": "Built-in functions"},
+        {"id": "py_bug_2", "code": "for i in range(10)\n    print(i)", "bug_line": 1, "question": "This loop won't run. Why?", "options": ["Missing colon after range(10)", "range should be Range", "print needs format", "i is not defined"], "correct": 0, "fixed_code": "for i in range(10):\n    print(i)", "explanation": "Python requires a colon (:) at the end of for, if, while, def, and class statements.", "concept": "Syntax - colons"},
+        {"id": "py_bug_3", "code": "x = 10\nif x = 10:\n    print('ten')", "bug_line": 2, "question": "Why does this if-statement cause an error?", "options": ["= should be == for comparison", "x is not a string", "Missing parentheses", "print is wrong"], "correct": 0, "fixed_code": "x = 10\nif x == 10:\n    print('ten')", "explanation": "= is assignment, == is comparison. This is one of the most common Python mistakes!", "concept": "Operators"},
+        {"id": "py_bug_4", "code": "my_list = [1, 2, 3]\nprint(my_list[3])", "bug_line": 2, "question": "This code crashes. Why?", "options": ["Index 3 is out of range (0-2)", "Lists start at 1", "Need to use get()", "Wrong bracket type"], "correct": 0, "fixed_code": "my_list = [1, 2, 3]\nprint(my_list[2])", "explanation": "Lists are 0-indexed! A list of 3 items has indices 0, 1, 2. Index 3 doesn't exist.", "concept": "List indexing"},
+        {"id": "py_bug_5", "code": "def add(a, b):\n    result = a + b\n\nprint(add(3, 4))", "bug_line": 2, "question": "add(3, 4) returns None. Why?", "options": ["Missing return statement", "result is local", "Wrong parameter names", "Need to use sum()"], "correct": 0, "fixed_code": "def add(a, b):\n    return a + b\n\nprint(add(3, 4))", "explanation": "Functions return None by default. You must use 'return' to send a value back!", "concept": "Functions - return"},
+        {"id": "py_bug_6", "code": "name = 'Alice\nprint(name)", "bug_line": 1, "question": "This string causes a SyntaxError:", "options": ["Missing closing quote", "Should use double quotes", "name is reserved", "print is wrong"], "correct": 0, "fixed_code": "name = 'Alice'\nprint(name)", "explanation": "Strings must have matching opening and closing quotes. Always check your quotes!", "concept": "Strings"},
+        {"id": "py_bug_7", "code": "numbers = [1, 2, 3]\nfor n in numbers:\n    numbers.append(n * 2)", "bug_line": 3, "question": "This creates an infinite loop. Why?", "options": ["Modifying list while iterating", "append is wrong method", "n * 2 is invalid", "for loop syntax wrong"], "correct": 0, "fixed_code": "numbers = [1, 2, 3]\nnew_nums = [n * 2 for n in numbers]", "explanation": "Never modify a list while iterating over it! Use a list comprehension or iterate over a copy.", "concept": "List iteration"},
+        {"id": "py_bug_8", "code": "age = input('Age: ')\nif age > 18:\n    print('Adult')", "bug_line": 2, "question": "Comparing age > 18 fails. Why?", "options": ["input() returns a string, not int", "Need >= not >", "age is undefined", "print syntax wrong"], "correct": 0, "fixed_code": "age = int(input('Age: '))\nif age > 18:\n    print('Adult')", "explanation": "input() always returns a string. Use int() to convert it to a number for comparison.", "concept": "Type conversion"},
+    ],
+    "javascript": [
+        {"id": "js_bug_1", "code": "console.log('Hello World'", "bug_line": 1, "question": "Find the syntax error:", "options": ["Missing closing parenthesis", "Wrong quotes", "Should be Console.log", "Missing semicolon"], "correct": 0, "fixed_code": "console.log('Hello World')", "explanation": "Every opening parenthesis needs a closing one. Count your brackets!", "concept": "Syntax basics"},
+        {"id": "js_bug_2", "code": "const x = 5;\nx = 10;\nconsole.log(x);", "bug_line": 2, "question": "Why does reassigning x fail?", "options": ["const cannot be reassigned", "x is not declared", "Need to use var", "Wrong syntax"], "correct": 0, "fixed_code": "let x = 5;\nx = 10;\nconsole.log(x);", "explanation": "const declares a constant that cannot be changed. Use 'let' for values that change.", "concept": "Variable declarations"},
+        {"id": "js_bug_3", "code": "if (x === 5) {\n    console.log('five')\n} else {\n    console.log('not five)\n}", "bug_line": 4, "question": "This code has a string error:", "options": ["Missing closing quote on 'not five'", "Wrong comparison operator", "Missing semicolon", "else syntax wrong"], "correct": 0, "fixed_code": "if (x === 5) {\n    console.log('five')\n} else {\n    console.log('not five')\n}", "explanation": "Always match your quotes! Missing a closing quote causes a SyntaxError.", "concept": "String syntax"},
+        {"id": "js_bug_4", "code": "const arr = [1, 2, 3];\nconsole.log(arr.length());", "bug_line": 2, "question": "arr.length() throws an error:", "options": ["length is a property, not a method", "Should use size()", "arr is const", "Wrong brackets"], "correct": 0, "fixed_code": "const arr = [1, 2, 3];\nconsole.log(arr.length);", "explanation": "length is a property (no parentheses), not a method. arr.length gives 3.", "concept": "Array properties"},
+        {"id": "js_bug_5", "code": "function greet(name) {\n    return 'Hello, ' + Name;\n}", "bug_line": 2, "question": "greet('Alice') returns an error:", "options": ["Name should be name (case sensitive)", "Wrong string concat", "Missing semicolon", "Function syntax wrong"], "correct": 0, "fixed_code": "function greet(name) {\n    return 'Hello, ' + name;\n}", "explanation": "JavaScript is case-sensitive! 'name' and 'Name' are different variables.", "concept": "Case sensitivity"},
+        {"id": "js_bug_6", "code": "for (let i = 0; i <= 5; i++) {\n    setTimeout(() => console.log(i), 1000);\n}", "bug_line": 2, "question": "What's the issue with this timer loop?", "options": ["All timeouts fire after same 1s delay", "i is not accessible in arrow function", "setTimeout syntax wrong", "No issue exists"], "correct": 0, "fixed_code": "for (let i = 0; i <= 5; i++) {\n    setTimeout(() => console.log(i), i * 1000);\n}", "explanation": "All timeouts are set with the same 1000ms delay. Use i*1000 for sequential timing.", "concept": "Async & closures"},
+    ],
+    "java": [
+        {"id": "java_bug_1", "code": "String name = \"Alice\";\nif (name == \"Alice\") {\n    System.out.println(\"Found!\");\n}", "bug_line": 2, "question": "Why might this comparison fail?", "options": ["Use .equals() for string comparison", "== works fine for strings", "name is null", "Wrong quotes"], "correct": 0, "fixed_code": "String name = \"Alice\";\nif (name.equals(\"Alice\")) {\n    System.out.println(\"Found!\");\n}", "explanation": "In Java, == compares references, not values. Always use .equals() for string comparison!", "concept": "String comparison"},
+        {"id": "java_bug_2", "code": "int[] nums = {1, 2, 3};\nSystem.out.println(nums.length());", "bug_line": 2, "question": "Why does .length() fail on arrays?", "options": ["Arrays use .length (no parentheses)", "Should use size()", "Wrong array syntax", "Missing import"], "correct": 0, "fixed_code": "int[] nums = {1, 2, 3};\nSystem.out.println(nums.length);", "explanation": "In Java, arrays use .length (property), while ArrayLists use .size() (method).", "concept": "Array vs ArrayList"},
+    ],
+}
+
+CODE_PUZZLE_CHALLENGES = {
+    "python": [
+        {"id": "py_puz_1", "title": "Hello World Function", "description": "Arrange to create a function that prints Hello World", "lines": ["def greet():", "    print('Hello World')", "greet()"], "correct_order": [0, 1, 2], "explanation": "First define the function, then the body, then call it.", "concept": "Function basics"},
+        {"id": "py_puz_2", "title": "Sum Calculator", "description": "Build a program that sums two numbers", "lines": ["result = a + b", "def add(a, b):", "print(add(5, 3))", "    return result"], "correct_order": [1, 0, 3, 2], "explanation": "Define function → calculate → return → call and print.", "concept": "Functions with return"},
+        {"id": "py_puz_3", "title": "List Filter", "description": "Filter even numbers from a list", "lines": ["evens = []", "numbers = [1, 2, 3, 4, 5, 6]", "print(evens)", "    evens.append(n)", "for n in numbers:", "    if n % 2 == 0:"], "correct_order": [1, 0, 4, 5, 3, 2], "explanation": "Create list → init result → loop → check condition → append → print.", "concept": "Loops and filtering"},
+        {"id": "py_puz_4", "title": "Class Creation", "description": "Create a Dog class with a bark method", "lines": ["    def bark(self):", "class Dog:", "my_dog = Dog('Rex')", "my_dog.bark()", "        self.name = name", "    def __init__(self, name):", "        print(f'{self.name} says Woof!')"], "correct_order": [1, 5, 4, 0, 6, 2, 3], "explanation": "class → __init__ → set attribute → method → method body → create → use.", "concept": "OOP basics"},
+        {"id": "py_puz_5", "title": "Try-Except Block", "description": "Handle division by zero error", "lines": ["    print('Cannot divide by zero!')", "try:", "    result = 10 / 0", "except ZeroDivisionError:", "    print(result)"], "correct_order": [1, 2, 4, 3, 0], "explanation": "try block first, then the risky code, then except catches the specific error.", "concept": "Error handling"},
+    ],
+    "javascript": [
+        {"id": "js_puz_1", "title": "Async Fetch", "description": "Arrange an async function to fetch data", "lines": ["const data = await response.json();", "async function getData() {", "console.log(data);", "const response = await fetch('/api');", "}"], "correct_order": [1, 3, 0, 2, 4], "explanation": "async function → fetch → parse JSON → use data → close.", "concept": "Async/Await"},
+        {"id": "js_puz_2", "title": "Array Map", "description": "Double all numbers in an array", "lines": ["const doubled = numbers.map(n => n * 2);", "const numbers = [1, 2, 3, 4, 5];", "console.log(doubled);"], "correct_order": [1, 0, 2], "explanation": "Create array → transform with map → display result.", "concept": "Array methods"},
+        {"id": "js_puz_3", "title": "Event Listener", "description": "Add a click handler to a button", "lines": ["});", "const btn = document.getElementById('myBtn');", "btn.addEventListener('click', () => {", "    alert('Clicked!');"], "correct_order": [1, 2, 3, 0], "explanation": "Select element → attach listener → define handler → close.", "concept": "DOM events"},
+    ],
+}
+
+SPEED_CODE_CHALLENGES = {
+    "python": [
+        {"id": "py_speed_1", "prompt": "Print 'Hello World'", "expected": "print('Hello World')", "time_limit": 15, "points": 10, "concept": "print function"},
+        {"id": "py_speed_2", "prompt": "Create variable x = 42", "expected": "x = 42", "time_limit": 10, "points": 10, "concept": "variables"},
+        {"id": "py_speed_3", "prompt": "Check if x equals 5", "expected": "if x == 5:", "time_limit": 12, "points": 15, "concept": "conditionals"},
+        {"id": "py_speed_4", "prompt": "Loop from 0 to 9", "expected": "for i in range(10):", "time_limit": 15, "points": 15, "concept": "for loops"},
+        {"id": "py_speed_5", "prompt": "Define function named greet", "expected": "def greet():", "time_limit": 12, "points": 15, "concept": "functions"},
+        {"id": "py_speed_6", "prompt": "Import the os module", "expected": "import os", "time_limit": 10, "points": 10, "concept": "imports"},
+        {"id": "py_speed_7", "prompt": "Create empty list called items", "expected": "items = []", "time_limit": 10, "points": 10, "concept": "lists"},
+        {"id": "py_speed_8", "prompt": "Return x + y from function", "expected": "return x + y", "time_limit": 12, "points": 15, "concept": "return values"},
+        {"id": "py_speed_9", "prompt": "Create dict with key 'name'", "expected": "data = {'name': ''}", "time_limit": 15, "points": 20, "concept": "dictionaries"},
+        {"id": "py_speed_10", "prompt": "List comprehension: squares of 1-5", "expected": "[x**2 for x in range(1,6)]", "time_limit": 20, "points": 25, "concept": "comprehensions"},
+    ],
+    "javascript": [
+        {"id": "js_speed_1", "prompt": "Log 'Hello' to console", "expected": "console.log('Hello')", "time_limit": 15, "points": 10, "concept": "console.log"},
+        {"id": "js_speed_2", "prompt": "Declare constant PI = 3.14", "expected": "const PI = 3.14;", "time_limit": 12, "points": 10, "concept": "constants"},
+        {"id": "js_speed_3", "prompt": "Arrow function that returns x*2", "expected": "const double = x => x * 2;", "time_limit": 18, "points": 20, "concept": "arrow functions"},
+        {"id": "js_speed_4", "prompt": "Destructure name from object", "expected": "const { name } = obj;", "time_limit": 15, "points": 20, "concept": "destructuring"},
+        {"id": "js_speed_5", "prompt": "Template literal with name var", "expected": "`Hello ${name}`", "time_limit": 15, "points": 15, "concept": "template literals"},
+    ],
+}
+
+@api_router.get("/games/bug-hunter/{language}")
+async def get_bug_hunter(language: str):
+    challenges = BUG_HUNTER_CHALLENGES.get(language, BUG_HUNTER_CHALLENGES.get("python", []))
+    selected = random.sample(challenges, min(5, len(challenges)))
+    # Remove correct answer info for client
+    safe = []
+    for c in selected:
+        safe.append({
+            "id": c["id"], "code": c["code"], "question": c["question"],
+            "options": c["options"], "concept": c["concept"],
+        })
+    return {"language": language, "challenges": safe, "total": len(safe)}
+
+@api_router.post("/games/bug-hunter/{language}/check")
+async def check_bug_hunter(language: str, data: dict):
+    challenge_id = data.get("challenge_id")
+    selected = data.get("selected", -1)
+    challenges = BUG_HUNTER_CHALLENGES.get(language, BUG_HUNTER_CHALLENGES.get("python", []))
+    for c in challenges:
+        if c["id"] == challenge_id:
+            correct = selected == c["correct"]
+            return {
+                "correct": correct,
+                "correct_answer": c["correct"],
+                "fixed_code": c["fixed_code"],
+                "explanation": c["explanation"],
+            }
+    raise HTTPException(status_code=404, detail="Challenge not found")
+
+@api_router.get("/games/code-puzzle/{language}")
+async def get_code_puzzle(language: str):
+    puzzles = CODE_PUZZLE_CHALLENGES.get(language, CODE_PUZZLE_CHALLENGES.get("python", []))
+    selected = random.sample(puzzles, min(3, len(puzzles)))
+    safe = []
+    for p in selected:
+        shuffled = list(range(len(p["lines"])))
+        random.shuffle(shuffled)
+        safe.append({
+            "id": p["id"], "title": p["title"], "description": p["description"],
+            "lines": [p["lines"][i] for i in shuffled],
+            "original_indices": shuffled,
+            "concept": p["concept"],
+        })
+    return {"language": language, "puzzles": safe, "total": len(safe)}
+
+@api_router.post("/games/code-puzzle/{language}/check")
+async def check_code_puzzle(language: str, data: dict):
+    puzzle_id = data.get("puzzle_id")
+    user_order = data.get("order", [])
+    puzzles = CODE_PUZZLE_CHALLENGES.get(language, CODE_PUZZLE_CHALLENGES.get("python", []))
+    for p in puzzles:
+        if p["id"] == puzzle_id:
+            correct = user_order == p["correct_order"]
+            return {
+                "correct": correct,
+                "correct_order": p["correct_order"],
+                "correct_lines": [p["lines"][i] for i in p["correct_order"]],
+                "explanation": p["explanation"],
+            }
+    raise HTTPException(status_code=404, detail="Puzzle not found")
+
+@api_router.get("/games/speed-code/{language}")
+async def get_speed_code(language: str):
+    challenges = SPEED_CODE_CHALLENGES.get(language, SPEED_CODE_CHALLENGES.get("python", []))
+    selected = random.sample(challenges, min(5, len(challenges)))
+    safe = [{"id": c["id"], "prompt": c["prompt"], "time_limit": c["time_limit"], "points": c["points"], "concept": c["concept"]} for c in selected]
+    return {"language": language, "challenges": safe, "total": len(safe)}
+
+@api_router.post("/games/speed-code/{language}/check")
+async def check_speed_code(language: str, data: dict):
+    challenge_id = data.get("challenge_id")
+    user_code = data.get("code", "").strip()
+    challenges = SPEED_CODE_CHALLENGES.get(language, SPEED_CODE_CHALLENGES.get("python", []))
+    for c in challenges:
+        if c["id"] == challenge_id:
+            expected_norm = c["expected"].strip().lower().replace(" ", "")
+            user_norm = user_code.lower().replace(" ", "")
+            correct = expected_norm == user_norm or c["expected"].strip().lower() in user_code.lower()
+            return {
+                "correct": correct,
+                "expected": c["expected"],
+                "points": c["points"] if correct else 0,
+            }
+    raise HTTPException(status_code=404, detail="Challenge not found")
+
+@api_router.post("/games/complete")
+async def complete_game(game: GameComplete, user: dict = Depends(get_current_user)):
+    """Track game completion and award XP"""
+    score_pct = (game.score / game.total * 100) if game.total > 0 else 0
+    perks = get_vip_perks(user)
+    
+    base_xp = int(score_pct * 0.3)  # Up to 30 XP per game
+    xp_earned = int(base_xp * perks["xp_multiplier"])
+    gems_earned = 2 if score_pct >= 70 else 0
+    
+    games_played = user.get("games_played", 0) + 1
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "xp": user.get("xp", 0) + xp_earned,
+            "gems": user.get("gems", 0) + gems_earned,
+            "daily_xp": user.get("daily_xp", 0) + xp_earned,
+            "games_played": games_played,
+            "level": 1 + ((user.get("xp", 0) + xp_earned) // 100),
+        }}
+    )
+    
+    await db.game_scores.insert_one({
+        "user_id": user["id"],
+        "game_type": game.game_type,
+        "language": game.language,
+        "score": game.score,
+        "total": game.total,
+        "score_pct": score_pct,
+        "xp_earned": xp_earned,
+        "time_taken": game.time_taken,
+        "played_at": datetime.utcnow().isoformat(),
+    })
+    
+    return {
+        "xp_earned": xp_earned,
+        "gems_earned": gems_earned,
+        "score_pct": int(score_pct),
+        "games_played": games_played,
+    }
+
+@api_router.get("/games/stats")
+async def get_game_stats(user: dict = Depends(get_current_user)):
+    scores = await db.game_scores.find({"user_id": user["id"]}).sort("played_at", -1).to_list(100)
+    by_type = {}
+    for s in scores:
+        gt = s.get("game_type", "unknown")
+        if gt not in by_type:
+            by_type[gt] = {"played": 0, "best_score": 0, "total_xp": 0}
+        by_type[gt]["played"] += 1
+        by_type[gt]["best_score"] = max(by_type[gt]["best_score"], s.get("score_pct", 0))
+        by_type[gt]["total_xp"] += s.get("xp_earned", 0)
+    
+    return {
+        "total_games": len(scores),
+        "games_played": user.get("games_played", 0),
+        "by_type": by_type,
+    }
+
 # ============== ROOT ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "Codero API v3 - Learn to code with VIP perks!"}
+    return {"message": "Codero API v4 - Learn to code with games & VIP perks!"}
 
 app.include_router(api_router)
 
