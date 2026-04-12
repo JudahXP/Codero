@@ -286,6 +286,21 @@ metadata:
   test_sequence: 3
   run_ui: false
 
+  - task: "Niche Language Gaming Support"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added comprehensive content for niche languages (Shell, Haskell, Elixir, Zig, Lua, Skript). Bug Hunter challenges: 5 per niche language. Speed Code challenges for all 6 niche languages. Need testing to verify language-specific challenges are returned (not falling back to Python)."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive niche language testing completed successfully. All 5/5 tests passed (100% success rate). Bug Hunter endpoints for all 5 niche languages (shell, haskell, elixir, zig, lua) return language-specific challenges with correct ID prefixes (sh_, hs_, ex_, zig_, lua_). Speed Code endpoints working correctly for all niche languages with language-specific prompts. Lessons endpoints verified for all 6 niche languages (including skript) with 30 lessons each containing language-specific content. Answer validation tested and working for Haskell Bug Hunter and Shell Speed Code. All challenges have proper security (no answer exposure) and correct structure. Niche languages are NOT falling back to Python - each has unique, language-specific content."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -300,6 +315,8 @@ agent_communication:
   - agent: "testing"
     message: "Comprehensive backend API testing completed successfully. All 10 tests passed (100% success rate). VIP subscription system fully functional with proper payment flow, status tracking, and perk application. Practice mode endpoints working correctly with detailed content and proper XP/hearts handling. Login ObjectId bug successfully fixed. All lesson completion flows (normal and practice mode) working perfectly. Backend API is production-ready."
   - agent: "main"
-    message: "Updated start screen with better info (20 languages, games, stats), added GAMES button to home screen quick actions. Now need to test the games backend endpoints: GET /games/bug-hunter/{language}, POST /games/bug-hunter/{language}/check, GET /games/code-puzzle/{language}, POST /games/code-puzzle/{language}/check, GET /games/speed-code/{language}, POST /games/speed-code/{language}/check, POST /games/complete, GET /games/stats. Test credentials: Register a fresh user (email: gametest@codero.com, password: test123, username: gametester)."
+    message: "MAJOR UPDATE: Added comprehensive content for niche languages. 1) Enhanced code validation patterns for Haskell, Lua, Skript, Shell, Elixir, Zig (all had minimal or missing patterns). 2) Custom lesson unit configs for all 6 niche languages with language-specific topics. 3) Detailed exercises (10 per topic) for Shell, Haskell, Elixir, Zig, Lua, Skript basics. 4) Bug Hunter challenges: 5 per niche language (Shell, Haskell, Elixir, Zig, Lua). 5) Speed Code challenges for all 6 niche languages. 6) Updated games hub frontend with 8 language options (scrollable). NEED TESTING: Bug Hunter for shell/haskell/elixir/zig/lua, Speed Code for same. Test: GET /api/games/bug-hunter/haskell, GET /api/games/speed-code/shell, etc. Register fresh user: nichetest@codero.com / test123 / nichetester"
   - agent: "testing"
     message: "Codero Games backend API testing completed successfully. All 8/8 tests passed (100% success rate). Comprehensive testing of all game endpoints: Bug Hunter (GET/POST), Code Puzzle (GET/POST), Speed Code (GET/POST), Game Complete, and Game Stats. All endpoints working perfectly with proper security (no answer exposure), authentication, XP/gems calculations, and game statistics tracking. Tested with multiple languages (Python, JavaScript). All game types properly implemented with comprehensive challenge data. Backend games API is production-ready."
+  - agent: "testing"
+    message: "Niche Language Gaming Support testing completed successfully. All 5/5 tests passed (100% success rate). Comprehensive verification of niche language support: 1) Bug Hunter endpoints for all 5 niche languages (shell, haskell, elixir, zig, lua) return language-specific challenges with correct ID prefixes (sh_, hs_, ex_, zig_, lua_). 2) Speed Code endpoints working correctly for all niche languages with language-specific prompts and concepts. 3) Lessons endpoints verified for all 6 niche languages (including skript) with 30 lessons each containing language-specific content and topics. 4) Answer validation tested and working for Haskell Bug Hunter and Shell Speed Code. All challenges have proper security (no answer exposure) and correct structure. CRITICAL FINDING: Niche languages are NOT falling back to Python - each has unique, language-specific content as required. All niche language gaming features are production-ready."

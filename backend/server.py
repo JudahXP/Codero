@@ -182,6 +182,22 @@ def validate_code(user_code: str, solution: str, language: str, exercise_type: s
             patterns_to_check.append(r'if\s+\[')
         if "for " in solution.lower():
             patterns_to_check.append(r'for\s+\w+\s+in')
+        if "while " in solution.lower():
+            patterns_to_check.append(r'while\s+')
+        if "case " in solution.lower():
+            patterns_to_check.append(r'case\s+')
+        if "function " in solution.lower() or "()" in solution:
+            patterns_to_check.append(r'(function\s+\w+|\w+\s*\(\))')
+        if "read " in solution.lower():
+            patterns_to_check.append(r'read\s+')
+        if "$" in solution:
+            patterns_to_check.append(r'\$\w+|\$\{')
+        if "grep" in solution.lower():
+            patterns_to_check.append(r'grep\s+')
+        if "|" in solution:
+            patterns_to_check.append(r'\|')
+        if "#!/" in solution:
+            patterns_to_check.append(r'#!')
             
     elif language == "rust":
         if "println!" in solution:
@@ -190,26 +206,162 @@ def validate_code(user_code: str, solution: str, language: str, exercise_type: s
             patterns_to_check.append(r'fn\s+\w+')
         if "let " in solution.lower():
             patterns_to_check.append(r'let\s+(mut\s+)?\w+')
+        if "struct " in solution.lower():
+            patterns_to_check.append(r'struct\s+\w+')
+        if "impl " in solution.lower():
+            patterns_to_check.append(r'impl\s+\w+')
+        if "match " in solution.lower():
+            patterns_to_check.append(r'match\s+')
             
     elif language == "go":
         if "fmt.Print" in solution:
             patterns_to_check.append(r'fmt\.Print')
         if "func " in solution.lower():
             patterns_to_check.append(r'func\s+\w*')
+        if "package " in solution.lower():
+            patterns_to_check.append(r'package\s+\w+')
+        if "import " in solution.lower():
+            patterns_to_check.append(r'import\s+')
+        if ":=" in solution:
+            patterns_to_check.append(r':=')
             
     elif language == "elixir":
         if "IO.puts" in solution:
             patterns_to_check.append(r'IO\.puts')
+        if "IO.inspect" in solution:
+            patterns_to_check.append(r'IO\.inspect')
         if "def " in solution.lower():
             patterns_to_check.append(r'def\s+\w+')
+        if "defp " in solution.lower():
+            patterns_to_check.append(r'defp\s+\w+')
         if "defmodule" in solution.lower():
             patterns_to_check.append(r'defmodule\s+\w+')
+        if "|>" in solution:
+            patterns_to_check.append(r'\|>')
+        if "case " in solution.lower():
+            patterns_to_check.append(r'case\s+')
+        if "cond " in solution.lower() or "cond\n" in solution.lower():
+            patterns_to_check.append(r'cond\s+do')
+        if "Enum." in solution:
+            patterns_to_check.append(r'Enum\.\w+')
+        if "fn " in solution.lower():
+            patterns_to_check.append(r'fn\s+')
+        if "->" in solution:
+            patterns_to_check.append(r'->')
+        if "do" in solution.lower():
+            patterns_to_check.append(r'\bdo\b')
             
     elif language == "zig":
         if "std.debug.print" in solution:
             patterns_to_check.append(r'std\.debug\.print')
         if "fn " in solution.lower():
             patterns_to_check.append(r'fn\s+\w+')
+        if "const " in solution.lower():
+            patterns_to_check.append(r'const\s+\w+')
+        if "var " in solution.lower():
+            patterns_to_check.append(r'var\s+\w+')
+        if "pub " in solution.lower():
+            patterns_to_check.append(r'pub\s+')
+        if "struct " in solution.lower():
+            patterns_to_check.append(r'struct\s*\{')
+        if "while " in solution.lower():
+            patterns_to_check.append(r'while\s*\(')
+        if "for " in solution.lower():
+            patterns_to_check.append(r'for\s*\(')
+        if "return " in solution.lower():
+            patterns_to_check.append(r'return\s+')
+        if "@import" in solution:
+            patterns_to_check.append(r'@import')
+            
+    elif language == "haskell":
+        if "putStrLn" in solution:
+            patterns_to_check.append(r'putStrLn\s+')
+        if "putStr " in solution:
+            patterns_to_check.append(r'putStr\s+')
+        if "print " in solution.lower():
+            patterns_to_check.append(r'print\s+')
+        if "main " in solution.lower() or "main=" in solution.lower().replace(" ", ""):
+            patterns_to_check.append(r'main\s*[=:]')
+        if "where" in solution.lower():
+            patterns_to_check.append(r'where')
+        if "let " in solution.lower():
+            patterns_to_check.append(r'let\s+')
+        if "in " in solution.lower():
+            patterns_to_check.append(r'\bin\b')
+        if "do" in solution.lower():
+            patterns_to_check.append(r'\bdo\b')
+        if "import " in solution.lower():
+            patterns_to_check.append(r'import\s+')
+        if "::" in solution:
+            patterns_to_check.append(r'::')
+        if "if " in solution.lower():
+            patterns_to_check.append(r'if\s+')
+        if "then " in solution.lower():
+            patterns_to_check.append(r'then\s+')
+        if "else " in solution.lower():
+            patterns_to_check.append(r'else\s+')
+        if "case " in solution.lower():
+            patterns_to_check.append(r'case\s+')
+        if "data " in solution.lower():
+            patterns_to_check.append(r'data\s+\w+')
+        if "class " in solution.lower():
+            patterns_to_check.append(r'class\s+\w+')
+        if "->" in solution:
+            patterns_to_check.append(r'->')
+        if "map " in solution.lower():
+            patterns_to_check.append(r'map\s+')
+        if "filter " in solution.lower():
+            patterns_to_check.append(r'filter\s+')
+            
+    elif language == "lua":
+        if "print" in solution.lower():
+            patterns_to_check.append(r'print\s*\(')
+        if "function " in solution.lower():
+            patterns_to_check.append(r'function\s+\w*')
+        if "local " in solution.lower():
+            patterns_to_check.append(r'local\s+\w+')
+        if "if " in solution.lower():
+            patterns_to_check.append(r'if\s+')
+        if "then" in solution.lower():
+            patterns_to_check.append(r'then')
+        if "end" in solution.lower():
+            patterns_to_check.append(r'\bend\b')
+        if "for " in solution.lower():
+            patterns_to_check.append(r'for\s+\w+')
+        if "while " in solution.lower():
+            patterns_to_check.append(r'while\s+')
+        if "repeat" in solution.lower():
+            patterns_to_check.append(r'repeat')
+        if "require" in solution.lower():
+            patterns_to_check.append(r'require\s*\(')
+        if "return " in solution.lower():
+            patterns_to_check.append(r'return\s+')
+        if "table." in solution.lower():
+            patterns_to_check.append(r'table\.\w+')
+        if ".." in solution:
+            patterns_to_check.append(r'\.\.')
+            
+    elif language == "skript":
+        if "broadcast" in solution.lower():
+            patterns_to_check.append(r'broadcast\s+')
+        if "send" in solution.lower():
+            patterns_to_check.append(r'send\s+')
+        if "command" in solution.lower():
+            patterns_to_check.append(r'command\s+')
+        if "trigger" in solution.lower():
+            patterns_to_check.append(r'trigger')
+        if "set " in solution.lower():
+            patterns_to_check.append(r'set\s+')
+        if "if " in solution.lower():
+            patterns_to_check.append(r'if\s+')
+        if "loop " in solution.lower():
+            patterns_to_check.append(r'loop\s+')
+        if "on " in solution.lower():
+            patterns_to_check.append(r'on\s+')
+        if "player" in solution.lower():
+            patterns_to_check.append(r'player')
+        if "event" in solution.lower():
+            patterns_to_check.append(r'event')
     
     # Check patterns
     patterns_matched = 0
@@ -546,6 +698,193 @@ def generate_exercises(language_id: str, topic: str, unit: int) -> List[dict]:
                 {"type": "multiple_choice", "question": "Call parent's __init__ using?", "options": ["super().__init__()", "parent.__init__()", "base.__init__()", "this.__init__()"], "correct": 0, "explanation": "super() accesses the parent class."},
             ]
     
+    # ===== SHELL (BASH) EXERCISES =====
+    if language_id == "shell":
+        if "echo" in topic_lower or "hello" in topic_lower or "print" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "What command prints text in bash?", "options": ["echo", "print", "say", "write"], "correct": 0, "explanation": "echo is the primary output command in bash."},
+                {"type": "code", "question": "Print 'Hello, World!' using echo", "starter": "", "solution": "echo 'Hello, World!'", "hint": "echo followed by text", "explanation": "echo outputs text to stdout."},
+                {"type": "fill_blank", "question": "___ 'Hello World'", "answer": "echo", "explanation": "echo is the command."},
+                {"type": "multiple_choice", "question": "What does echo -n do?", "options": ["No trailing newline", "Print numbers", "Echo to file", "Silent mode"], "correct": 0, "explanation": "-n suppresses the trailing newline."},
+                {"type": "code", "question": "Print 'Name: Alice' using echo", "starter": "", "solution": "echo 'Name: Alice'", "hint": "Just use echo with the text", "explanation": "echo prints whatever string you give it."},
+                {"type": "multiple_choice", "question": "Difference between single and double quotes?", "options": ["Double quotes expand variables", "No difference", "Single quotes expand vars", "Neither expands"], "correct": 0, "explanation": "Double quotes allow $variable expansion."},
+                {"type": "code", "question": "Print value of $HOME variable", "starter": "", "solution": "echo $HOME", "hint": "$ accesses variable values", "explanation": "$VARIABLE accesses environment variables."},
+                {"type": "fill_blank", "question": "echo -___ suppresses newline", "answer": "n", "explanation": "-n flag for no newline."},
+                {"type": "code", "question": "Print 'Line 1' and 'Line 2' on separate lines", "starter": "", "solution": "echo 'Line 1'\necho 'Line 2'", "hint": "Use two echo commands", "explanation": "Each echo adds a newline by default."},
+                {"type": "multiple_choice", "question": "What does printf do vs echo?", "options": ["Formatted output like C", "Same as echo", "Only prints numbers", "Prints to file"], "correct": 0, "explanation": "printf gives C-style formatted output."},
+            ]
+        elif "variable" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How to create a variable in bash?", "options": ["name=value (no spaces)", "name = value", "set name value", "var name = value"], "correct": 0, "explanation": "No spaces around = in bash variable assignment!"},
+                {"type": "code", "question": "Create variable name with value 'Alice'", "starter": "", "solution": "name='Alice'", "hint": "No spaces around =", "explanation": "Bash is strict about no spaces in assignment."},
+                {"type": "fill_blank", "question": "Access variable: echo $___", "answer": "name", "explanation": "$ prefix accesses variable value."},
+                {"type": "multiple_choice", "question": "What does readonly do?", "options": ["Makes variable constant", "Read from file", "Read user input", "Print variable"], "correct": 0, "explanation": "readonly prevents reassignment."},
+                {"type": "code", "question": "Read user input into variable 'age'", "starter": "", "solution": "read -p 'Enter age: ' age", "hint": "read -p 'prompt' variable", "explanation": "read captures user input."},
+                {"type": "multiple_choice", "question": "How to use variable in string?", "options": ["echo \"Hello $name\"", "echo 'Hello $name'", "echo Hello + name", "echo Hello name"], "correct": 0, "explanation": "Double quotes expand variables, single quotes don't."},
+                {"type": "code", "question": "Create x=5 and y=10 then echo their sum", "starter": "", "solution": "x=5\ny=10\necho $((x + y))", "hint": "$(( )) for arithmetic", "explanation": "$(( )) does integer arithmetic in bash."},
+                {"type": "fill_blank", "question": "$((3 + 4)) uses ___ expansion", "answer": "arithmetic", "explanation": "$(( )) is arithmetic expansion."},
+                {"type": "code", "question": "Export a variable PATH_EXTRA='/usr/local'", "starter": "", "solution": "export PATH_EXTRA='/usr/local'", "hint": "export makes it available to subprocesses", "explanation": "export shares variable with child processes."},
+                {"type": "multiple_choice", "question": "What does $? contain?", "options": ["Exit code of last command", "Current PID", "Username", "Home directory"], "correct": 0, "explanation": "$? holds the last command's exit status."},
+            ]
+        elif "if" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "Bash if statement ends with?", "options": ["fi", "end", "endif", "}"], "correct": 0, "explanation": "fi closes the if block (if backwards!)."},
+                {"type": "code", "question": "If x=5, check if x equals 5", "starter": "x=5\n", "solution": "x=5\nif [ $x -eq 5 ]; then\n    echo 'Five!'\nfi", "hint": "Use [ $x -eq 5 ] for numeric compare", "explanation": "-eq is 'equals' for numbers."},
+                {"type": "fill_blank", "question": "if [ $a ___ $b ]; then  # greater than", "answer": "-gt", "explanation": "-gt means 'greater than' for integers."},
+                {"type": "multiple_choice", "question": "String equality operator?", "options": ["=", "-eq", "==", "equals"], "correct": 0, "explanation": "= compares strings in [ ] brackets."},
+                {"type": "code", "question": "Check if file /etc/passwd exists", "starter": "", "solution": "if [ -f /etc/passwd ]; then\n    echo 'File exists'\nfi", "hint": "-f tests if file exists", "explanation": "-f checks regular file existence."},
+                {"type": "multiple_choice", "question": "What does -d check?", "options": ["Directory exists", "File deleted", "Data type", "Debug mode"], "correct": 0, "explanation": "-d checks if directory exists."},
+                {"type": "code", "question": "Write if-else: if x>0 echo 'positive' else 'not positive'", "starter": "x=-3\n", "solution": "x=-3\nif [ $x -gt 0 ]; then\n    echo 'positive'\nelse\n    echo 'not positive'\nfi", "hint": "else goes before fi", "explanation": "else handles the other case."},
+                {"type": "fill_blank", "question": "if [ -___ filename ]  # check file exists", "answer": "f", "explanation": "-f tests for regular file."},
+                {"type": "code", "question": "Check if string is empty: s=''", "starter": "s=''\n", "solution": "s=''\nif [ -z \"$s\" ]; then\n    echo 'Empty'\nfi", "hint": "-z checks if string length is zero", "explanation": "-z is true when string is empty."},
+                {"type": "multiple_choice", "question": "What's the && operator in bash?", "options": ["AND - run next if previous succeeded", "OR operator", "Always run both", "Pipe"], "correct": 0, "explanation": "&& runs the next command only if the first succeeds."},
+            ]
+
+    # ===== HASKELL EXERCISES =====
+    elif language_id == "haskell":
+        if "hello" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "What function prints a line in Haskell?", "options": ["putStrLn", "print", "echo", "console.log"], "correct": 0, "explanation": "putStrLn prints a string with a newline."},
+                {"type": "code", "question": "Print 'Hello, World!' in Haskell", "starter": "", "solution": "main = putStrLn \"Hello, World!\"", "hint": "main = putStrLn \"text\"", "explanation": "main is the entry point; putStrLn prints text."},
+                {"type": "fill_blank", "question": "main = ___ \"Hello\"", "answer": "putStrLn", "explanation": "putStrLn outputs a string line."},
+                {"type": "multiple_choice", "question": "What is the entry point of a Haskell program?", "options": ["main", "start", "init", "run"], "correct": 0, "explanation": "main is always the entry point."},
+                {"type": "code", "question": "Print the number 42 using print", "starter": "", "solution": "main = print 42", "hint": "print works for showable types", "explanation": "print shows any Showable value."},
+                {"type": "multiple_choice", "question": "Difference between putStrLn and print?", "options": ["putStrLn is for strings, print adds quotes", "No difference", "print is for strings", "putStrLn is deprecated"], "correct": 0, "explanation": "print adds quotes around strings; putStrLn doesn't."},
+                {"type": "fill_blank", "question": "main = ___ 42  -- print a number", "answer": "print", "explanation": "print displays any Show instance."},
+                {"type": "code", "question": "Print two lines using do notation", "starter": "", "solution": "main = do\n    putStrLn \"Line 1\"\n    putStrLn \"Line 2\"", "hint": "do notation sequences IO actions", "explanation": "do lets you sequence multiple IO actions."},
+                {"type": "multiple_choice", "question": "Haskell strings use which quotes?", "options": ["Double quotes", "Single quotes", "Backticks", "No quotes"], "correct": 0, "explanation": "Haskell uses double quotes for strings, single quotes for Char."},
+                {"type": "code", "question": "Concatenate two strings and print", "starter": "", "solution": "main = putStrLn (\"Hello\" ++ \" World\")", "hint": "++ concatenates strings/lists", "explanation": "++ is the list/string concatenation operator."},
+            ]
+        elif "type" in topic_lower or "function" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "What is Haskell's type for whole numbers?", "options": ["Int or Integer", "Number", "Num", "float"], "correct": 0, "explanation": "Int is fixed-size, Integer is arbitrary precision."},
+                {"type": "code", "question": "Define a function double that multiplies by 2", "starter": "", "solution": "double x = x * 2", "hint": "functionName param = expression", "explanation": "Haskell functions are defined with pattern = expression."},
+                {"type": "fill_blank", "question": "add x y = x ___ y", "answer": "+", "explanation": "Operators work naturally in expressions."},
+                {"type": "multiple_choice", "question": "What does :: mean in Haskell?", "options": ["Has type (type annotation)", "Assignment", "Comparison", "Concatenation"], "correct": 0, "explanation": ":: declares the type of a value or function."},
+                {"type": "code", "question": "Write type signature: add takes two Ints, returns Int", "starter": "", "solution": "add :: Int -> Int -> Int\nadd x y = x + y", "hint": "funcName :: Type -> Type -> ReturnType", "explanation": "-> separates parameter and return types."},
+                {"type": "multiple_choice", "question": "Are Haskell functions pure by default?", "options": ["Yes, no side effects", "No, they can mutate", "Only in main", "Depends on module"], "correct": 0, "explanation": "Haskell functions are pure — same input always gives same output."},
+                {"type": "code", "question": "Define isEven that returns True for even numbers", "starter": "", "solution": "isEven n = n `mod` 2 == 0", "hint": "Use mod for remainder", "explanation": "mod gives remainder; backticks make it infix."},
+                {"type": "fill_blank", "question": "factorial 0 = 1\nfactorial n = n * factorial (n-___)", "answer": "1", "explanation": "Recursion: base case 0=1, recursive case n*(n-1)!."},
+                {"type": "code", "question": "Use where clause: area of circle with radius r", "starter": "", "solution": "circleArea r = pi * r * r\n    where pi = 3.14159", "hint": "where defines local bindings", "explanation": "where lets you name intermediate values."},
+                {"type": "multiple_choice", "question": "What is a guard in Haskell?", "options": ["Conditional branches using |", "Error handler", "Type checker", "Import guard"], "correct": 0, "explanation": "Guards use | to define conditional function bodies."},
+            ]
+
+    # ===== ELIXIR EXERCISES =====
+    elif language_id == "elixir":
+        if "hello" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "What function prints in Elixir?", "options": ["IO.puts", "print", "echo", "console.log"], "correct": 0, "explanation": "IO.puts prints a string with a newline."},
+                {"type": "code", "question": "Print 'Hello, World!' in Elixir", "starter": "", "solution": "IO.puts(\"Hello, World!\")", "hint": "IO.puts(\"text\")", "explanation": "IO.puts outputs to stdout."},
+                {"type": "fill_blank", "question": "IO.___(\"Hello\")", "answer": "puts", "explanation": "IO.puts prints with newline."},
+                {"type": "multiple_choice", "question": "What does IO.inspect do?", "options": ["Prints and returns the value", "Only prints", "Inspects types", "Debugs code"], "correct": 0, "explanation": "IO.inspect is great for debugging — it prints AND returns the value."},
+                {"type": "code", "question": "Use IO.inspect to debug a value", "starter": "", "solution": "IO.inspect([1, 2, 3])", "hint": "IO.inspect(value)", "explanation": "IO.inspect returns the value, useful in pipelines."},
+                {"type": "multiple_choice", "question": "What is an atom in Elixir?", "options": [":name — a constant whose name is its value", "A number type", "A string type", "A variable"], "correct": 0, "explanation": "Atoms like :ok, :error are constants — their name IS the value."},
+                {"type": "code", "question": "Create an atom called :hello and inspect it", "starter": "", "solution": "IO.inspect(:hello)", "hint": "Atoms start with :", "explanation": ":hello is an atom literal."},
+                {"type": "fill_blank", "question": "Elixir atoms start with ___", "answer": ":", "explanation": "The colon prefix creates an atom."},
+                {"type": "code", "question": "String interpolation: print 'Hello, name!'", "starter": "name = \"Alice\"\n", "solution": "name = \"Alice\"\nIO.puts(\"Hello, #{name}!\")", "hint": "#{variable} inside double-quoted strings", "explanation": "String interpolation uses #{} syntax."},
+                {"type": "multiple_choice", "question": "How does Elixir handle immutability?", "options": ["All data is immutable", "Only atoms are immutable", "Nothing is immutable", "Optional immutability"], "correct": 0, "explanation": "All data in Elixir is immutable — you create new values, not modify."},
+            ]
+        elif "pattern" in topic_lower or "match" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "What does = do in Elixir?", "options": ["Pattern matching (not just assignment)", "Only assignment", "Comparison", "Type check"], "correct": 0, "explanation": "= is the match operator. It does pattern matching!"},
+                {"type": "code", "question": "Pattern match to extract first element", "starter": "", "solution": "[head | _tail] = [1, 2, 3]\nIO.puts(head)", "hint": "[head | tail] splits a list", "explanation": "| separates head from tail of a list."},
+                {"type": "fill_blank", "question": "{a, _} = {1, 2}  # a = ___", "answer": "1", "explanation": "Pattern matching extracts the first element."},
+                {"type": "multiple_choice", "question": "What does _ mean in pattern matching?", "options": ["Ignore this value", "Any value assigned", "Error", "Nil"], "correct": 0, "explanation": "_ is a wildcard — it matches anything and discards it."},
+                {"type": "code", "question": "Use case to match on atoms", "starter": "", "solution": "status = :ok\ncase status do\n  :ok -> IO.puts(\"Success\")\n  :error -> IO.puts(\"Failed\")\nend", "hint": "case value do pattern -> result end", "explanation": "case matches against patterns."},
+                {"type": "multiple_choice", "question": "What is the pipe operator |> ?", "options": ["Passes result to next function", "Or operator", "Pattern match", "Assignment"], "correct": 0, "explanation": "|> passes the result of the left side as the first argument to the right."},
+                {"type": "code", "question": "Use pipe operator to uppercase a string", "starter": "", "solution": "\"hello\" |> String.upcase() |> IO.puts()", "hint": "value |> function |> function", "explanation": "Pipe chains make data flow readable."},
+                {"type": "fill_blank", "question": "\"hello\" |> String.___()  # uppercase", "answer": "upcase", "explanation": "String.upcase() converts to uppercase."},
+                {"type": "code", "question": "Define a function that greets using pattern matching", "starter": "", "solution": "defmodule Greeter do\n  def greet(:morning), do: IO.puts(\"Good morning!\")\n  def greet(:evening), do: IO.puts(\"Good evening!\")\nend", "hint": "Multiple function clauses match different patterns", "explanation": "Elixir allows multiple function definitions with different patterns."},
+                {"type": "multiple_choice", "question": "Can you match on function arguments?", "options": ["Yes, with multiple clauses", "No", "Only in case", "Only with guards"], "correct": 0, "explanation": "Function heads can pattern match on arguments."},
+            ]
+
+    # ===== ZIG EXERCISES =====
+    elif language_id == "zig":
+        if "hello" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How do you print in Zig?", "options": ["std.debug.print", "printf", "console.log", "print"], "correct": 0, "explanation": "std.debug.print is Zig's debug output function."},
+                {"type": "code", "question": "Print 'Hello, World!' in Zig", "starter": "", "solution": "const std = @import(\"std\");\npub fn main() void {\n    std.debug.print(\"Hello, World!\\n\", .{});\n}", "hint": "Use std.debug.print with .{} for args", "explanation": "Zig uses @import for the standard library."},
+                {"type": "fill_blank", "question": "const std = @___(\"std\");", "answer": "import", "explanation": "@import brings in modules."},
+                {"type": "multiple_choice", "question": "What does pub mean in Zig?", "options": ["Public — accessible from outside", "Publish", "Pure", "Put"], "correct": 0, "explanation": "pub makes a declaration visible outside the file."},
+                {"type": "code", "question": "Declare a constant integer in Zig", "starter": "", "solution": "const x: i32 = 42;", "hint": "const name: type = value;", "explanation": "const declares immutable bindings in Zig."},
+                {"type": "multiple_choice", "question": "What is Zig's philosophy?", "options": ["No hidden allocations, explicit control", "Garbage collected", "Object-oriented", "Dynamic typing"], "correct": 0, "explanation": "Zig gives you explicit control over memory with no hidden behavior."},
+                {"type": "fill_blank", "question": "pub fn main() ___ { }", "answer": "void", "explanation": "main returns void (nothing)."},
+                {"type": "code", "question": "Create a mutable variable in Zig", "starter": "", "solution": "var x: i32 = 5;\nx = 10;", "hint": "var for mutable, const for immutable", "explanation": "var allows mutation, const does not."},
+                {"type": "multiple_choice", "question": "What type is i32?", "options": ["32-bit signed integer", "32-bit float", "32 characters", "32 bytes"], "correct": 0, "explanation": "i32 = signed integer with 32 bits. u32 = unsigned."},
+                {"type": "code", "question": "Print a variable using std.debug.print", "starter": "", "solution": "const x: i32 = 42;\nstd.debug.print(\"x = {}\\n\", .{x});", "hint": "{} is the format placeholder", "explanation": ".{x} passes x as a format argument."},
+            ]
+        elif "variable" in topic_lower or "const" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "Which keyword makes an immutable binding?", "options": ["const", "var", "let", "final"], "correct": 0, "explanation": "const creates immutable bindings in Zig."},
+                {"type": "code", "question": "Create const pi with value 3.14", "starter": "", "solution": "const pi: f64 = 3.14;", "hint": "const name: f64 = value;", "explanation": "f64 is a 64-bit floating point."},
+                {"type": "fill_blank", "question": "___ x: i32 = 5;  // mutable", "answer": "var", "explanation": "var creates mutable bindings."},
+                {"type": "multiple_choice", "question": "Can you reassign a const?", "options": ["No, compile error", "Yes", "Only in functions", "Only once"], "correct": 0, "explanation": "const is truly immutable in Zig."},
+                {"type": "code", "question": "Create array of 5 integers", "starter": "", "solution": "const arr = [5]i32{ 1, 2, 3, 4, 5 };", "hint": "[length]type{ values }", "explanation": "Zig arrays have compile-time known lengths."},
+                {"type": "multiple_choice", "question": "What is comptime in Zig?", "options": ["Compile-time evaluation", "Runtime check", "Comment time", "Compare time"], "correct": 0, "explanation": "comptime forces evaluation at compile time for optimization."},
+                {"type": "code", "question": "Use defer to print 'Done' at end of scope", "starter": "", "solution": "defer std.debug.print(\"Done\\n\", .{});", "hint": "defer runs at scope exit", "explanation": "defer ensures cleanup runs when leaving scope."},
+                {"type": "fill_blank", "question": "const slice = arr[0..___];  // first 3", "answer": "3", "explanation": "Slicing uses [start..end] with exclusive end."},
+                {"type": "code", "question": "Use optional type for nullable integer", "starter": "", "solution": "var maybe_x: ?i32 = null;\nmaybe_x = 42;", "hint": "?Type makes it optional", "explanation": "?i32 means 'maybe an i32, maybe null'."},
+                {"type": "multiple_choice", "question": "Error handling in Zig uses?", "options": ["Error unions (!) and try/catch", "Exceptions", "Error codes only", "Panic only"], "correct": 0, "explanation": "Zig uses ! for error unions, try to unwrap, catch to handle."},
+            ]
+
+    # ===== LUA EXERCISES =====
+    elif language_id == "lua":
+        if "hello" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How do you print in Lua?", "options": ["print()", "echo", "console.log", "puts"], "correct": 0, "explanation": "print() is Lua's output function."},
+                {"type": "code", "question": "Print 'Hello, World!' in Lua", "starter": "", "solution": "print('Hello, World!')", "hint": "print('text')", "explanation": "print() outputs text to stdout."},
+                {"type": "fill_blank", "question": "___('Hello World')", "answer": "print", "explanation": "print is the output function."},
+                {"type": "multiple_choice", "question": "Lua is commonly used for?", "options": ["Game scripting (Roblox, game engines)", "Web servers", "Operating systems", "Databases"], "correct": 0, "explanation": "Lua is popular for game scripting, especially Roblox."},
+                {"type": "code", "question": "Concatenate two strings and print", "starter": "", "solution": "print('Hello' .. ' World')", "hint": ".. is string concatenation", "explanation": "In Lua, .. joins strings together."},
+                {"type": "multiple_choice", "question": "What operator concatenates strings in Lua?", "options": ["..", "+", "&", "concat"], "correct": 0, "explanation": ".. is the string concatenation operator."},
+                {"type": "code", "question": "Print a number and a string together", "starter": "", "solution": "print('Score: ' .. tostring(42))", "hint": "Use tostring() to convert numbers", "explanation": "tostring() converts numbers for concatenation."},
+                {"type": "fill_blank", "question": "'Hello' ___ ' World'  -- concatenate", "answer": "..", "explanation": ".. joins strings in Lua."},
+                {"type": "code", "question": "Print multiple values separated by tab", "starter": "", "solution": "print('Name', 'Age', 'Score')", "hint": "print() with commas adds tabs", "explanation": "Multiple arguments to print are tab-separated."},
+                {"type": "multiple_choice", "question": "Lua arrays start at index?", "options": ["1", "0", "-1", "Any number"], "correct": 0, "explanation": "Lua tables/arrays are 1-indexed by convention!"},
+            ]
+        elif "variable" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How to create a local variable?", "options": ["local x = 5", "var x = 5", "let x = 5", "int x = 5"], "correct": 0, "explanation": "local declares a variable with local scope."},
+                {"type": "code", "question": "Create local variable name = 'Alice'", "starter": "", "solution": "local name = 'Alice'\nprint(name)", "hint": "local varname = value", "explanation": "local limits scope to current block."},
+                {"type": "fill_blank", "question": "___ x = 10  -- local variable", "answer": "local", "explanation": "local keyword for local scope."},
+                {"type": "multiple_choice", "question": "What happens without 'local'?", "options": ["Variable becomes global", "Error", "Stays local", "Read-only"], "correct": 0, "explanation": "Without local, variables are global (bad practice!)."},
+                {"type": "code", "question": "Create a table (object) with name and age", "starter": "", "solution": "local person = {name = 'Alice', age = 25}\nprint(person.name)", "hint": "local t = {key = value}", "explanation": "Tables are Lua's only data structure."},
+                {"type": "multiple_choice", "question": "What is nil in Lua?", "options": ["Absence of value (like null)", "Zero", "Empty string", "False"], "correct": 0, "explanation": "nil means 'no value' in Lua."},
+                {"type": "code", "question": "Create array with numbers 10, 20, 30", "starter": "", "solution": "local arr = {10, 20, 30}\nprint(arr[1])", "hint": "Arrays are tables with numeric keys", "explanation": "Remember: Lua arrays start at index 1!"},
+                {"type": "fill_blank", "question": "Check type: ___(x)  -- returns type name", "answer": "type", "explanation": "type() returns the type as a string."},
+                {"type": "code", "question": "Multiple assignment: a=1, b=2, c=3", "starter": "", "solution": "local a, b, c = 1, 2, 3\nprint(a, b, c)", "hint": "Lua supports multiple assignment", "explanation": "Multiple variables can be assigned at once."},
+                {"type": "multiple_choice", "question": "How many data types does Lua have?", "options": ["8 (nil, boolean, number, string, table, function, thread, userdata)", "3", "Unlimited", "1"], "correct": 0, "explanation": "Lua has 8 basic types — tables handle arrays, dicts, objects."},
+            ]
+
+    # ===== SKRIPT EXERCISES =====
+    elif language_id == "skript":
+        if "hello" in topic_lower or "message" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How to send a message to all players?", "options": ["broadcast", "send", "tell", "say"], "correct": 0, "explanation": "broadcast sends a message to every player on the server."},
+                {"type": "code", "question": "Broadcast 'Hello World' to the server", "starter": "", "solution": "broadcast \"Hello World\"", "hint": "broadcast \"text\"", "explanation": "broadcast shows a message to all players."},
+                {"type": "fill_blank", "question": "___ \"Welcome to the server!\"", "answer": "broadcast", "explanation": "broadcast is for server-wide messages."},
+                {"type": "multiple_choice", "question": "How to send message to one player?", "options": ["send \"msg\" to player", "broadcast \"msg\"", "tell player \"msg\"", "dm player \"msg\""], "correct": 0, "explanation": "send \"message\" to player sends to one player."},
+                {"type": "code", "question": "Send a message to the event player", "starter": "", "solution": "send \"Hello %player%!\" to player", "hint": "send \"text\" to player", "explanation": "%player% inserts the player's name."},
+                {"type": "multiple_choice", "question": "What does %player% do in Skript?", "options": ["Inserts the player's name", "Creates a player", "Kills a player", "Nothing"], "correct": 0, "explanation": "% wraps expressions that get evaluated."},
+                {"type": "code", "question": "Create a command /hello that broadcasts", "starter": "", "solution": "command /hello:\n    trigger:\n        broadcast \"Hello from %player%!\"", "hint": "command /name: trigger: effects", "explanation": "Commands need command, trigger, and effects."},
+                {"type": "fill_blank", "question": "command /greet:\n    ___:\n        broadcast \"Hi!\"", "answer": "trigger", "explanation": "trigger defines what happens when command runs."},
+                {"type": "code", "question": "Send a colored message (green)", "starter": "", "solution": "broadcast \"&aThis is green text!\"", "hint": "&a is green color code", "explanation": "Minecraft color codes: &a=green, &c=red, &e=yellow."},
+                {"type": "multiple_choice", "question": "What is the Skript file extension?", "options": [".sk", ".skript", ".mc", ".txt"], "correct": 0, "explanation": "Skript files use the .sk extension."},
+            ]
+        elif "event" in topic_lower or "join" in topic_lower:
+            exercises = [
+                {"type": "multiple_choice", "question": "How to detect when a player joins?", "options": ["on join:", "on player join:", "event join:", "when join:"], "correct": 0, "explanation": "on join: triggers when any player joins."},
+                {"type": "code", "question": "Welcome a player when they join", "starter": "", "solution": "on join:\n    send \"Welcome, %player%!\" to player", "hint": "on join: + send to player", "explanation": "on join triggers for each joining player."},
+                {"type": "fill_blank", "question": "on ___:\n    broadcast \"%player% left!\"", "answer": "quit", "explanation": "on quit: triggers when player leaves."},
+                {"type": "multiple_choice", "question": "How to detect block breaking?", "options": ["on break:", "on mine:", "on destroy:", "on click:"], "correct": 0, "explanation": "on break: detects block breaking."},
+                {"type": "code", "question": "Cancel damage to players (no PvP)", "starter": "", "solution": "on damage of player:\n    cancel event", "hint": "cancel event stops it from happening", "explanation": "cancel event prevents the default action."},
+                {"type": "multiple_choice", "question": "What does 'cancel event' do?", "options": ["Prevents the event from happening", "Logs the event", "Delays the event", "Nothing"], "correct": 0, "explanation": "cancel event stops the default Minecraft behavior."},
+                {"type": "code", "question": "Give player diamond sword on join", "starter": "", "solution": "on join:\n    give player diamond sword", "hint": "give player [item]", "explanation": "give directly puts items in inventory."},
+                {"type": "fill_blank", "question": "on death:\n    ___ event  # prevent death", "answer": "cancel", "explanation": "cancel event prevents the death."},
+                {"type": "code", "question": "Broadcast when a player breaks a diamond ore", "starter": "", "solution": "on break of diamond ore:\n    broadcast \"%player% found diamonds!\"", "hint": "on break of [block type]:", "explanation": "You can filter events by specific items/blocks."},
+                {"type": "multiple_choice", "question": "Which event fires on right-click?", "options": ["on right click:", "on click:", "on use:", "on interact:"], "correct": 0, "explanation": "on right click: detects right-click interactions."},
+            ]
+
     # If no specific exercises, generate generic ones
     if not exercises:
         exercises = [
@@ -589,6 +928,46 @@ def generate_lessons(language_id: str) -> List[dict]:
             ("Text Processing", ["Grep", "Sed", "Awk", "Cut & Sort", "Pipes"]),
             ("Scripting", ["Script Structure", "Arguments", "Functions", "Arrays", "Error Handling"]),
             ("Advanced", ["Process Management", "Cron Jobs", "Debugging", "Best Practices", "Real Scripts"]),
+        ],
+        "haskell": [
+            ("Basics", ["Hello World", "Types & Values", "Functions", "Let & Where", "Comments"]),
+            ("Types", ["Int & Integer", "Bool & Char", "Strings & Lists", "Tuples", "Type Signatures"]),
+            ("Functions", ["Pattern Matching", "Guards", "Recursion", "Higher-Order Functions", "Lambda"]),
+            ("Lists", ["List Operations", "List Comprehension", "Map & Filter", "Fold", "Zip"]),
+            ("Type System", ["Type Classes", "Custom Types", "Data & Newtype", "Maybe & Either", "Deriving"]),
+            ("Advanced", ["IO Monad", "Do Notation", "Functors", "Applicatives", "Monads"]),
+        ],
+        "elixir": [
+            ("Basics", ["Hello World", "Variables & Atoms", "Data Types", "Strings", "Basic Operators"]),
+            ("Collections", ["Lists", "Tuples", "Maps", "Keyword Lists", "Enum Module"]),
+            ("Control Flow", ["Pattern Matching", "Case", "Cond & If", "With", "Pipe Operator"]),
+            ("Functions", ["Named Functions", "Anonymous Functions", "Guards", "Default Arguments", "Captures"]),
+            ("Modules", ["Defmodule", "Module Attributes", "Structs", "Protocols", "Behaviours"]),
+            ("Concurrency", ["Processes", "Tasks", "GenServer", "Supervision", "OTP Basics"]),
+        ],
+        "zig": [
+            ("Basics", ["Hello World", "Variables & Const", "Data Types", "Comments", "Print & Debug"]),
+            ("Types", ["Integers", "Floats", "Booleans", "Arrays", "Slices"]),
+            ("Control Flow", ["If Expressions", "Switch", "For Loops", "While Loops", "Defer"]),
+            ("Functions", ["Function Basics", "Parameters", "Return Values", "Error Unions", "Generics"]),
+            ("Memory", ["Pointers", "Allocators", "Slices & Arrays", "Optional Values", "Undefined"]),
+            ("Advanced", ["Structs", "Enums", "Unions", "Comptime", "Error Handling"]),
+        ],
+        "lua": [
+            ("Basics", ["Hello World", "Variables", "Data Types", "Comments", "Operators"]),
+            ("Control Flow", ["If Statements", "Else & Elseif", "For Loops", "While Loops", "Repeat Until"]),
+            ("Functions", ["Function Basics", "Parameters", "Return Values", "Closures", "Varargs"]),
+            ("Tables", ["Table Basics", "Arrays", "Dictionaries", "Table Methods", "Metatables"]),
+            ("Strings", ["String Basics", "String Methods", "Pattern Matching", "Formatting", "Concatenation"]),
+            ("Advanced", ["Modules", "File I/O", "Coroutines", "Error Handling", "OOP with Tables"]),
+        ],
+        "skript": [
+            ("Basics", ["Hello World", "Messages", "Variables", "Comments", "Data Types"]),
+            ("Events", ["Join Event", "Click Event", "Chat Event", "Death Event", "Custom Events"]),
+            ("Commands", ["Command Basics", "Arguments", "Permissions", "Aliases", "Cooldowns"]),
+            ("Effects", ["Teleport", "Give Items", "Spawn Mobs", "Potions", "Particles"]),
+            ("Conditions", ["If Statements", "Comparisons", "Permissions Check", "Item Check", "Player State"]),
+            ("Advanced", ["Loops", "Functions", "Scoreboards", "GUIs", "Timers"]),
         ],
     }
     
@@ -1400,6 +1779,41 @@ BUG_HUNTER_CHALLENGES = {
         {"id": "java_bug_1", "code": "String name = \"Alice\";\nif (name == \"Alice\") {\n    System.out.println(\"Found!\");\n}", "bug_line": 2, "question": "Why might this comparison fail?", "options": ["Use .equals() for string comparison", "== works fine for strings", "name is null", "Wrong quotes"], "correct": 0, "fixed_code": "String name = \"Alice\";\nif (name.equals(\"Alice\")) {\n    System.out.println(\"Found!\");\n}", "explanation": "In Java, == compares references, not values. Always use .equals() for string comparison!", "concept": "String comparison"},
         {"id": "java_bug_2", "code": "int[] nums = {1, 2, 3};\nSystem.out.println(nums.length());", "bug_line": 2, "question": "Why does .length() fail on arrays?", "options": ["Arrays use .length (no parentheses)", "Should use size()", "Wrong array syntax", "Missing import"], "correct": 0, "fixed_code": "int[] nums = {1, 2, 3};\nSystem.out.println(nums.length);", "explanation": "In Java, arrays use .length (property), while ArrayLists use .size() (method).", "concept": "Array vs ArrayList"},
     ],
+    "shell": [
+        {"id": "sh_bug_1", "code": "name = 'Alice'\necho $name", "bug_line": 1, "question": "This variable assignment fails. Why?", "options": ["No spaces around = in bash", "name is reserved", "Missing quotes", "echo is wrong"], "correct": 0, "fixed_code": "name='Alice'\necho $name", "explanation": "In bash, variable assignment must have NO spaces around =. 'name=value' not 'name = value'!", "concept": "Variable assignment"},
+        {"id": "sh_bug_2", "code": "if [ $x == 5 ]; then\n    echo 'five'\nfi", "bug_line": 1, "question": "What if x is empty/unset?", "options": ["Unquoted $x causes error when empty", "== is wrong operator", "fi is misspelled", "then is not needed"], "correct": 0, "fixed_code": "if [ \"$x\" -eq 5 ]; then\n    echo 'five'\nfi", "explanation": "Always quote variables in [ ]. Unquoted empty vars cause 'unary operator expected' errors!", "concept": "Quoting variables"},
+        {"id": "sh_bug_3", "code": "for i in 1 2 3 4 5\ndo\n    echo i\ndone", "bug_line": 3, "question": "This prints 'i' five times. Why?", "options": ["Missing $ before i", "echo is wrong", "do is misplaced", "done is wrong"], "correct": 0, "fixed_code": "for i in 1 2 3 4 5\ndo\n    echo $i\ndone", "explanation": "You need $ to access variable values. 'i' is literal text, '$i' is the variable.", "concept": "Variable access"},
+        {"id": "sh_bug_4", "code": "#!/bin/bash\ncount=0\ncat file.txt | while read line; do\n    count=$((count + 1))\ndone\necho $count", "bug_line": 3, "question": "count is always 0 after the loop. Why?", "options": ["Pipe creates subshell, changes lost", "cat is wrong", "read is wrong", "count type issue"], "correct": 0, "fixed_code": "#!/bin/bash\ncount=0\nwhile read line; do\n    count=$((count + 1))\ndone < file.txt\necho $count", "explanation": "Pipes create subshells! Variables modified inside don't affect the parent. Use redirection instead.", "concept": "Subshells"},
+        {"id": "sh_bug_5", "code": "files=`ls *.txt`\nfor f in $files; do\n    echo $f\ndone", "bug_line": 1, "question": "This breaks with filenames containing spaces:", "options": ["Don't parse ls output, use globs", "Backticks are wrong", "for loop syntax", "echo is wrong"], "correct": 0, "fixed_code": "for f in *.txt; do\n    echo \"$f\"\ndone", "explanation": "Never parse ls! Use globs directly. Also quote variables to handle spaces in filenames.", "concept": "Glob patterns"},
+    ],
+    "haskell": [
+        {"id": "hs_bug_1", "code": "main = putStrLn 'Hello World'", "bug_line": 1, "question": "This gives a type error. Why?", "options": ["Single quotes are for Char, use double quotes", "putStrLn is wrong", "main is wrong", "Missing do"], "correct": 0, "fixed_code": "main = putStrLn \"Hello World\"", "explanation": "In Haskell, 'a' is a Char, \"abc\" is a String. putStrLn needs a String!", "concept": "Strings vs Chars"},
+        {"id": "hs_bug_2", "code": "double x = x * 2\nmain = putStrLn (double 5)", "bug_line": 2, "question": "putStrLn fails on the result. Why?", "options": ["double returns Int, putStrLn needs String", "double is wrong", "main syntax wrong", "Missing import"], "correct": 0, "fixed_code": "double x = x * 2\nmain = print (double 5)", "explanation": "putStrLn only accepts String. Use 'print' for other types, or 'show' to convert.", "concept": "Type system"},
+        {"id": "hs_bug_3", "code": "factorial 0 = 1\nfactorial n = n * factorial n - 1", "bug_line": 2, "question": "This causes infinite recursion:", "options": ["Need parentheses: factorial (n-1)", "Base case is wrong", "* is wrong", "Missing type signature"], "correct": 0, "fixed_code": "factorial 0 = 1\nfactorial n = n * factorial (n - 1)", "explanation": "Without parentheses, Haskell reads it as (n * factorial n) - 1, causing infinite recursion!", "concept": "Function application"},
+        {"id": "hs_bug_4", "code": "head []", "bug_line": 1, "question": "What happens when you call head on an empty list?", "options": ["Runtime exception - empty list", "Returns Nothing", "Returns 0", "Compile error"], "correct": 0, "fixed_code": "-- Use pattern matching or safe functions\ncase xs of\n  [] -> Nothing\n  (x:_) -> Just x", "explanation": "head crashes on empty lists! Use pattern matching or safe alternatives.", "concept": "Partial functions"},
+        {"id": "hs_bug_5", "code": "add x y = x + y\nmain = do\n  let result = add 5\n  print result", "bug_line": 3, "question": "This doesn't give an error but isn't a number:", "options": ["add 5 returns a partially applied function", "let is wrong", "do is unnecessary", "print can't handle it"], "correct": 0, "fixed_code": "add x y = x + y\nmain = do\n  let result = add 5 3\n  print result", "explanation": "In Haskell, functions are curried. 'add 5' returns a function waiting for the second argument!", "concept": "Currying"},
+    ],
+    "elixir": [
+        {"id": "ex_bug_1", "code": "name = \"Alice\"\nname = \"Bob\"\nIO.puts(name)", "bug_line": 2, "question": "Does this work? What prints?", "options": ["Prints 'Bob' — rebinding, not mutation", "Error — can't reassign", "Prints 'Alice'", "Prints both"], "correct": 0, "fixed_code": "name = \"Alice\"\nname = \"Bob\"  # rebinding, not mutating!\nIO.puts(name)  # prints Bob", "explanation": "Elixir allows rebinding (new binding), but the original value is unchanged. This is NOT mutation!", "concept": "Immutability vs rebinding"},
+        {"id": "ex_bug_2", "code": "list = [1, 2, 3]\nList.push(list, 4)", "bug_line": 2, "question": "List.push doesn't exist. How to add?", "options": ["Use list ++ [4] or [4 | list]", "Use List.add", "Use List.append", "Use list.push(4)"], "correct": 0, "fixed_code": "list = [1, 2, 3]\nnew_list = list ++ [4]", "explanation": "Elixir lists don't have push. Use ++ to concatenate or [head | tail] to prepend.", "concept": "List operations"},
+        {"id": "ex_bug_3", "code": "defmodule Math do\n  def add(a, b) do\n    a + b\n  end\nend\nresult = Math.add(1, 2, 3)", "bug_line": 6, "question": "This call fails. Why?", "options": ["add/2 expects 2 args, got 3", "defmodule is wrong", "def syntax wrong", "Math is reserved"], "correct": 0, "fixed_code": "defmodule Math do\n  def add(a, b) do\n    a + b\n  end\nend\nresult = Math.add(1, 2)", "explanation": "Elixir functions have fixed arity. add/2 means it takes exactly 2 arguments.", "concept": "Function arity"},
+        {"id": "ex_bug_4", "code": "map = %{name: \"Alice\"}\nmap.age", "bug_line": 2, "question": "Accessing a missing key with dot notation:", "options": ["Raises KeyError for missing key", "Returns nil", "Returns 0", "Returns empty"], "correct": 0, "fixed_code": "map = %{name: \"Alice\"}\nMap.get(map, :age, \"unknown\")", "explanation": "Dot notation raises KeyError for missing keys. Use Map.get/3 with a default instead!", "concept": "Map access"},
+        {"id": "ex_bug_5", "code": "Enum.map([1,2,3], fn x -> x * 2)", "bug_line": 1, "question": "This anonymous function is incomplete:", "options": ["Missing 'end' keyword", "fn is wrong", "Enum is wrong", "-> is wrong"], "correct": 0, "fixed_code": "Enum.map([1,2,3], fn x -> x * 2 end)", "explanation": "Anonymous functions need 'end'. Or use capture: &(&1 * 2)", "concept": "Anonymous functions"},
+    ],
+    "zig": [
+        {"id": "zig_bug_1", "code": "const x = 5;\nx = 10;", "bug_line": 2, "question": "Reassigning x fails. Why?", "options": ["const is immutable, use var", "Missing type annotation", "Wrong syntax", "5 is wrong type"], "correct": 0, "fixed_code": "var x: i32 = 5;\nx = 10;", "explanation": "const creates immutable bindings. Use 'var' if you need to change the value.", "concept": "const vs var"},
+        {"id": "zig_bug_2", "code": "var x: i32 = 5;\nvar y: u32 = x;", "bug_line": 2, "question": "Assigning i32 to u32 fails:", "options": ["Can't implicitly convert signed to unsigned", "Types are the same", "var is wrong", "Missing semicolon"], "correct": 0, "fixed_code": "var x: i32 = 5;\nvar y: u32 = @intCast(x);", "explanation": "Zig requires explicit casts between numeric types. Use @intCast for safe conversion.", "concept": "Type safety"},
+        {"id": "zig_bug_3", "code": "const arr = [3]i32{1, 2, 3};\nstd.debug.print(\"{}\", .{arr[3]});", "bug_line": 2, "question": "This causes a panic. Why?", "options": ["Index 3 out of bounds (0-2)", "Wrong print format", "arr is const", "Missing semicolon"], "correct": 0, "fixed_code": "const arr = [3]i32{1, 2, 3};\nstd.debug.print(\"{}\", .{arr[2]});", "explanation": "Array of 3 elements has indices 0, 1, 2. Index 3 is out of bounds!", "concept": "Array bounds"},
+        {"id": "zig_bug_4", "code": "fn add(a: i32, b: i32) i32 {\n    a + b\n}", "bug_line": 2, "question": "This function doesn't compile:", "options": ["Missing return keyword", "Wrong types", "Missing semicolon", "fn is wrong"], "correct": 0, "fixed_code": "fn add(a: i32, b: i32) i32 {\n    return a + b;\n}", "explanation": "Zig requires explicit return statements (unlike Rust or Haskell).", "concept": "Return statements"},
+        {"id": "zig_bug_5", "code": "var maybe: ?i32 = null;\nconst val = maybe + 1;", "bug_line": 2, "question": "Can't add to an optional. How to fix?", "options": ["Unwrap with orelse or if", "Cast to i32", "Remove ?", "Use var"], "correct": 0, "fixed_code": "var maybe: ?i32 = null;\nconst val = (maybe orelse 0) + 1;", "explanation": "Optional types (?T) must be unwrapped before use. 'orelse' provides a default.", "concept": "Optional types"},
+    ],
+    "lua": [
+        {"id": "lua_bug_1", "code": "local arr = {10, 20, 30}\nprint(arr[0])", "bug_line": 2, "question": "This prints nil. Why?", "options": ["Lua arrays start at index 1, not 0", "arr is wrong type", "print is wrong", "Missing local"], "correct": 0, "fixed_code": "local arr = {10, 20, 30}\nprint(arr[1])", "explanation": "Lua arrays are 1-indexed! The first element is at index 1, not 0.", "concept": "1-based indexing"},
+        {"id": "lua_bug_2", "code": "x = 5\nif x = 5 then\n    print('five')\nend", "bug_line": 2, "question": "This code has a syntax error:", "options": ["Use == for comparison, = is assignment", "if is wrong", "then not needed", "end not needed"], "correct": 0, "fixed_code": "x = 5\nif x == 5 then\n    print('five')\nend", "explanation": "= is assignment, == is comparison. Classic bug in many languages!", "concept": "Comparison operators"},
+        {"id": "lua_bug_3", "code": "function greet(name)\n    return 'Hello ' + name\nend", "bug_line": 2, "question": "String concatenation fails:", "options": ["Use .. not + for string concat", "+ only for numbers", "return is wrong", "function syntax wrong"], "correct": 0, "fixed_code": "function greet(name)\n    return 'Hello ' .. name\nend", "explanation": "In Lua, + is only for numbers. Use .. for string concatenation!", "concept": "String concatenation"},
+        {"id": "lua_bug_4", "code": "t = {}\nt.insert('hello')", "bug_line": 2, "question": "This method call is wrong:", "options": ["Use table.insert(t, 'hello')", "Use t:insert", "Use t.add", "Use t.push"], "correct": 0, "fixed_code": "t = {}\ntable.insert(t, 'hello')", "explanation": "table.insert is a library function, not a method. Pass the table as first argument.", "concept": "Table library"},
+        {"id": "lua_bug_5", "code": "function Counter()\n    count = 0\n    return count\nend", "bug_line": 2, "question": "count is a global variable! How to fix?", "options": ["Add 'local' keyword", "Use self.count", "Use var count", "Use let count"], "correct": 0, "fixed_code": "function Counter()\n    local count = 0\n    return count\nend", "explanation": "Without 'local', variables are global in Lua. Always use 'local' for local scope!", "concept": "Local variables"},
+    ],
 }
 
 CODE_PUZZLE_CHALLENGES = {
@@ -1436,6 +1850,46 @@ SPEED_CODE_CHALLENGES = {
         {"id": "js_speed_3", "prompt": "Arrow function that returns x*2", "expected": "const double = x => x * 2;", "time_limit": 18, "points": 20, "concept": "arrow functions"},
         {"id": "js_speed_4", "prompt": "Destructure name from object", "expected": "const { name } = obj;", "time_limit": 15, "points": 20, "concept": "destructuring"},
         {"id": "js_speed_5", "prompt": "Template literal with name var", "expected": "`Hello ${name}`", "time_limit": 15, "points": 15, "concept": "template literals"},
+    ],
+    "shell": [
+        {"id": "sh_speed_1", "prompt": "Print 'Hello World'", "expected": "echo 'Hello World'", "time_limit": 12, "points": 10, "concept": "echo"},
+        {"id": "sh_speed_2", "prompt": "Create variable x=42", "expected": "x=42", "time_limit": 8, "points": 10, "concept": "variables"},
+        {"id": "sh_speed_3", "prompt": "Print variable x", "expected": "echo $x", "time_limit": 10, "points": 10, "concept": "variable access"},
+        {"id": "sh_speed_4", "prompt": "If x equals 5", "expected": "if [ $x -eq 5 ]; then", "time_limit": 18, "points": 20, "concept": "conditionals"},
+        {"id": "sh_speed_5", "prompt": "Loop 1 to 5 with seq", "expected": "for i in $(seq 1 5); do", "time_limit": 18, "points": 20, "concept": "for loops"},
+        {"id": "sh_speed_6", "prompt": "Shebang line for bash", "expected": "#!/bin/bash", "time_limit": 12, "points": 15, "concept": "shebang"},
+        {"id": "sh_speed_7", "prompt": "Read user input into name", "expected": "read name", "time_limit": 10, "points": 10, "concept": "read input"},
+    ],
+    "haskell": [
+        {"id": "hs_speed_1", "prompt": "Print 'Hello World'", "expected": "main = putStrLn \"Hello World\"", "time_limit": 18, "points": 15, "concept": "putStrLn"},
+        {"id": "hs_speed_2", "prompt": "Double function: x times 2", "expected": "double x = x * 2", "time_limit": 15, "points": 15, "concept": "functions"},
+        {"id": "hs_speed_3", "prompt": "Type signature: add Int Int Int", "expected": "add :: Int -> Int -> Int", "time_limit": 18, "points": 20, "concept": "type signatures"},
+        {"id": "hs_speed_4", "prompt": "List of 1 to 5", "expected": "[1, 2, 3, 4, 5]", "time_limit": 12, "points": 10, "concept": "lists"},
+        {"id": "hs_speed_5", "prompt": "Factorial base case", "expected": "factorial 0 = 1", "time_limit": 15, "points": 15, "concept": "pattern matching"},
+        {"id": "hs_speed_6", "prompt": "Map double over list", "expected": "map (*2) [1,2,3]", "time_limit": 18, "points": 20, "concept": "higher-order functions"},
+    ],
+    "elixir": [
+        {"id": "ex_speed_1", "prompt": "Print 'Hello World'", "expected": "IO.puts(\"Hello World\")", "time_limit": 15, "points": 10, "concept": "IO.puts"},
+        {"id": "ex_speed_2", "prompt": "Create atom :ok", "expected": ":ok", "time_limit": 8, "points": 10, "concept": "atoms"},
+        {"id": "ex_speed_3", "prompt": "Pipe string to upcase", "expected": "\"hello\" |> String.upcase()", "time_limit": 18, "points": 20, "concept": "pipe operator"},
+        {"id": "ex_speed_4", "prompt": "Define module Greeter", "expected": "defmodule Greeter do", "time_limit": 15, "points": 15, "concept": "modules"},
+        {"id": "ex_speed_5", "prompt": "Pattern match list head", "expected": "[head | _] = [1, 2, 3]", "time_limit": 18, "points": 20, "concept": "pattern matching"},
+        {"id": "ex_speed_6", "prompt": "Map over list with Enum", "expected": "Enum.map([1,2,3], &(&1 * 2))", "time_limit": 22, "points": 25, "concept": "Enum.map"},
+    ],
+    "zig": [
+        {"id": "zig_speed_1", "prompt": "Import std library", "expected": "const std = @import(\"std\");", "time_limit": 18, "points": 15, "concept": "@import"},
+        {"id": "zig_speed_2", "prompt": "Declare const x as i32 = 5", "expected": "const x: i32 = 5;", "time_limit": 15, "points": 15, "concept": "constants"},
+        {"id": "zig_speed_3", "prompt": "Declare mutable y as i32 = 10", "expected": "var y: i32 = 10;", "time_limit": 15, "points": 15, "concept": "variables"},
+        {"id": "zig_speed_4", "prompt": "Main function signature", "expected": "pub fn main() void {", "time_limit": 18, "points": 20, "concept": "main function"},
+        {"id": "zig_speed_5", "prompt": "Optional i32 set to null", "expected": "var x: ?i32 = null;", "time_limit": 15, "points": 20, "concept": "optionals"},
+    ],
+    "lua": [
+        {"id": "lua_speed_1", "prompt": "Print 'Hello World'", "expected": "print('Hello World')", "time_limit": 12, "points": 10, "concept": "print"},
+        {"id": "lua_speed_2", "prompt": "Local variable x = 5", "expected": "local x = 5", "time_limit": 10, "points": 10, "concept": "local variables"},
+        {"id": "lua_speed_3", "prompt": "Concatenate 'Hi' and ' there'", "expected": "'Hi' .. ' there'", "time_limit": 15, "points": 15, "concept": "concatenation"},
+        {"id": "lua_speed_4", "prompt": "Create empty table", "expected": "local t = {}", "time_limit": 10, "points": 10, "concept": "tables"},
+        {"id": "lua_speed_5", "prompt": "Define function greet()", "expected": "function greet()", "time_limit": 12, "points": 15, "concept": "functions"},
+        {"id": "lua_speed_6", "prompt": "For loop 1 to 10", "expected": "for i = 1, 10 do", "time_limit": 15, "points": 15, "concept": "for loops"},
     ],
 }
 

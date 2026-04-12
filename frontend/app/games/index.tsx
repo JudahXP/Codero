@@ -45,8 +45,13 @@ const GAMES = [
 
 const LANGUAGES = [
   { id: 'python', name: 'PYTHON', color: '#3776AB' },
-  { id: 'javascript', name: 'JAVASCRIPT', color: '#F7DF1E' },
-  { id: 'java', name: 'JAVA', color: '#ED8B00' },
+  { id: 'javascript', name: 'JS', color: '#F7DF1E' },
+  { id: 'shell', name: 'SHELL', color: '#4EAA25' },
+  { id: 'lua', name: 'LUA', color: '#000080' },
+  { id: 'haskell', name: 'HASKELL', color: '#5D4F85' },
+  { id: 'elixir', name: 'ELIXIR', color: '#4B275F' },
+  { id: 'zig', name: 'ZIG', color: '#F7A41D' },
+  { id: 'skript', name: 'SKRIPT', color: '#6B8E23' },
 ];
 
 export default function GamesScreen() {
@@ -88,7 +93,7 @@ export default function GamesScreen() {
         )}
 
         {/* Language Selector */}
-        <View style={styles.langSelector}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.langScroll} contentContainerStyle={styles.langSelector}>
           {LANGUAGES.map(lang => (
             <TouchableOpacity
               key={lang.id}
@@ -104,7 +109,7 @@ export default function GamesScreen() {
               ]}>{lang.name}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {GAMES.map(game => (
@@ -180,8 +185,11 @@ const styles = StyleSheet.create({
   },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statValue: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#FFF' },
+  langScroll: {
+    maxHeight: 44, marginBottom: 16,
+  },
   langSelector: {
-    flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 16,
+    paddingHorizontal: 20, gap: 8,
   },
   langChip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
