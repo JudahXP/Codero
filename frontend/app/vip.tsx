@@ -3,9 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -21,19 +20,15 @@ interface Perk {
   description: string;
 }
 
-interface VIPInfo {
-  price: number;
-  currency: string;
-  period: string;
-  perks: Perk[];
-}
-
 export default function VIPScreen() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
-  const [vipInfo, setVipInfo] = useState<VIPInfo | null>(null);
+  const { user } = useAuth();
+  const [vipInfo, setVipInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [subscribing, setSubscribing] = useState(false);
+
+  const streak = user?.streak || 0;
+  const isVIP = streak >= 7;
+  const progress = Math.min(streak / 7, 1);
 
   useEffect(() => {
     fetchVIPInfo();
@@ -41,357 +36,176 @@ export default function VIPScreen() {
 
   const fetchVIPInfo = async () => {
     try {
-      const response = await api.get('/vip/info');
-      setVipInfo(response.data);
-    } catch (error) {
-      console.error('Failed to fetch VIP info:', error);
+      const res = await api.get('/vip/info');
+      setVipInfo(res.data);
+    } catch (e) {
+      console.error('VIP info error:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscribe = async () => {
-    Alert.alert(
-      'SUBSCRIBE TO VIP',
-      `Unlock all VIP perks for $${vipInfo?.price}/${vipInfo?.period}?`,
-      [
-        { text: 'CANCEL', style: 'cancel' },
-        {
-          text: 'SUBSCRIBE',
-          onPress: async () => {
-            setSubscribing(true);
-            try {
-              const response = await api.post('/vip/subscribe', { payment_method: 'card' });
-              Alert.alert('SUCCESS!', response.data.message);
-              await refreshUser();
-            } catch (error: any) {
-              Alert.alert('ERROR', error.response?.data?.detail || 'Subscription failed');
-            } finally {
-              setSubscribing(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const isVIP = user?.is_vip || user?.vip_until;
-
   if (loading) {
     return (
-      <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
-        <SafeAreaView style={styles.centered}>
-          <ActivityIndicator size="large" color="#FFD700" />
-        </SafeAreaView>
-      </LinearGradient>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FFD700" />
+      </View>
     );
   }
 
   return (
-    <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#FFD700" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>VIP MEMBERSHIP</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>VIP STATUS</Text>
           <View style={{ width: 44 }} />
         </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* VIP Badge */}
-          <View style={styles.vipBadge}>
-            <LinearGradient
-              colors={['#FFD700', '#FFA500']}
-              style={styles.vipBadgeGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="star" size={48} color="#0D0D0D" />
-            </LinearGradient>
-            <Text style={styles.vipTitle}>CODERO VIP</Text>
-            <Text style={styles.vipPrice}>
-              ${vipInfo?.price}/{vipInfo?.period?.toUpperCase()}
+          <View style={styles.badgeSection}>
+            <View style={[styles.bigBadge, isVIP && styles.bigBadgeActive]}>
+              <Ionicons name="star" size={50} color={isVIP ? '#FFD700' : '#555'} />
+            </View>
+            <Text style={[styles.statusText, isVIP && { color: '#FFD700' }]}>
+              {isVIP ? 'VIP ACTIVE!' : 'NOT VIP YET'}
+            </Text>
+            <Text style={styles.statusDesc}>
+              {isVIP
+                ? 'KEEP YOUR STREAK TO STAY VIP!'
+                : `REACH A 7-DAY STREAK TO UNLOCK VIP`}
             </Text>
           </View>
 
-          {isVIP && (
-            <View style={styles.activeCard}>
-              <Ionicons name="checkmark-circle" size={24} color="#00FF88" />
-              <Text style={styles.activeText}>VIP ACTIVE</Text>
-              <Text style={styles.activeUntil}>
-                Until: {new Date(user?.vip_until || '').toLocaleDateString()}
-              </Text>
+          {/* Streak Progress */}
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Ionicons name="flame" size={18} color="#FF6B6B" />
+              <Text style={styles.progressLabel}>STREAK: {streak} / 7 DAYS</Text>
             </View>
-          )}
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            </View>
+            <View style={styles.daysRow}>
+              {[1, 2, 3, 4, 5, 6, 7].map(day => (
+                <View key={day} style={[styles.dayDot, streak >= day && styles.dayDotActive]}>
+                  <Text style={[styles.dayText, streak >= day && styles.dayTextActive]}>{day}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
-          {/* Perks List */}
+          {/* Perks */}
           <Text style={styles.perksTitle}>VIP PERKS</Text>
-          <View style={styles.perksList}>
-            {vipInfo?.perks.map((perk, index) => (
-              <View key={index} style={styles.perkCard}>
-                <View style={styles.perkIcon}>
-                  <Ionicons name={perk.icon as any} size={24} color="#FFD700" />
-                </View>
-                <View style={styles.perkInfo}>
-                  <Text style={styles.perkTitle}>{perk.title}</Text>
-                  <Text style={styles.perkDesc}>{perk.description}</Text>
-                </View>
+          {vipInfo?.perks?.map((perk: Perk, i: number) => (
+            <View key={i} style={[styles.perkCard, !isVIP && styles.perkLocked]}>
+              <View style={[styles.perkIcon, isVIP && { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
+                <Ionicons name={perk.icon as any} size={22} color={isVIP ? '#FFD700' : '#555'} />
               </View>
-            ))}
-          </View>
+              <View style={styles.perkInfo}>
+                <Text style={[styles.perkTitle, !isVIP && { color: '#666' }]}>{perk.title}</Text>
+                <Text style={styles.perkDesc}>{perk.description}</Text>
+              </View>
+              {isVIP ? (
+                <Ionicons name="checkmark-circle" size={20} color="#00FF88" />
+              ) : (
+                <Ionicons name="lock-closed" size={20} color="#555" />
+              )}
+            </View>
+          ))}
 
-          {/* Comparison */}
-          <View style={styles.comparisonSection}>
-            <Text style={styles.comparisonTitle}>FREE VS VIP</Text>
-            <View style={styles.comparisonTable}>
-              <View style={styles.comparisonRow}>
-                <Text style={styles.comparisonLabel}>HEARTS</Text>
-                <Text style={styles.comparisonFree}>5</Text>
-                <Text style={styles.comparisonVip}>10</Text>
-              </View>
-              <View style={styles.comparisonRow}>
-                <Text style={styles.comparisonLabel}>XP MULTIPLIER</Text>
-                <Text style={styles.comparisonFree}>1x</Text>
-                <Text style={styles.comparisonVip}>1.5x</Text>
-              </View>
-              <View style={styles.comparisonRow}>
-                <Text style={styles.comparisonLabel}>HINTS/LESSON</Text>
-                <Text style={styles.comparisonFree}>1</Text>
-                <Text style={styles.comparisonVip}>5</Text>
-              </View>
-              <View style={styles.comparisonRow}>
-                <Text style={styles.comparisonLabel}>STREAK FREEZE</Text>
-                <Text style={styles.comparisonFree}>0/WEEK</Text>
-                <Text style={styles.comparisonVip}>2/WEEK</Text>
-              </View>
-              <View style={styles.comparisonRow}>
-                <Text style={styles.comparisonLabel}>ADS</Text>
-                <Text style={styles.comparisonFree}>YES</Text>
-                <Text style={styles.comparisonVip}>NO</Text>
-              </View>
+          {/* How to earn */}
+          <View style={styles.howToSection}>
+            <Text style={styles.howToTitle}>HOW TO EARN VIP</Text>
+            <View style={styles.howToStep}>
+              <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
+              <Text style={styles.stepText}>COMPLETE AT LEAST ONE LESSON OR GAME DAILY</Text>
+            </View>
+            <View style={styles.howToStep}>
+              <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
+              <Text style={styles.stepText}>MAINTAIN YOUR STREAK FOR 7 DAYS</Text>
+            </View>
+            <View style={styles.howToStep}>
+              <View style={styles.stepNum}><Text style={styles.stepNumText}>3</Text></View>
+              <Text style={styles.stepText}>VIP STAYS ACTIVE AS LONG AS YOUR STREAK IS 7+</Text>
             </View>
           </View>
 
-          {/* Subscribe Button */}
-          {!isVIP && (
-            <TouchableOpacity
-              style={styles.subscribeButton}
-              onPress={handleSubscribe}
-              disabled={subscribing}
-            >
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                style={styles.subscribeGradient}
-              >
-                {subscribing ? (
-                  <ActivityIndicator color="#0D0D0D" />
-                ) : (
-                  <>
-                    <Ionicons name="star" size={20} color="#0D0D0D" />
-                    <Text style={styles.subscribeText}>SUBSCRIBE NOW</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {isVIP && (
-            <TouchableOpacity
-              style={styles.extendButton}
-              onPress={handleSubscribe}
-              disabled={subscribing}
-            >
-              <Text style={styles.extendText}>EXTEND MEMBERSHIP</Text>
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.bottomPadding} />
+          <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   safeArea: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D0D0D' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderWidth: 1,
-    borderColor: '#FFD700',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: '#FFD700',
+    justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 12,
-    color: '#FFD700',
-  },
+  headerTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 12, color: '#FFD700' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
-  vipBadge: {
-    alignItems: 'center',
-    marginVertical: 24,
+  badgeSection: { alignItems: 'center', paddingVertical: 24 },
+  bigBadge: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(85,85,85,0.2)', borderWidth: 3, borderColor: '#333',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
-  vipBadgeGradient: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+  bigBadgeActive: { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: '#FFD700' },
+  statusText: { fontFamily: 'PressStart2P_400Regular', fontSize: 16, color: '#888', marginBottom: 8 },
+  statusDesc: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, color: '#888', textAlign: 'center', lineHeight: 14 },
+  progressSection: {
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 16, marginBottom: 24,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  vipTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 20,
-    color: '#FFD700',
-    marginBottom: 8,
+  progressHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  progressLabel: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFF' },
+  progressBar: { height: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 5, overflow: 'hidden', marginBottom: 12 },
+  progressFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 5 },
+  daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayDot: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  vipPrice: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 14,
-    color: '#FFF',
-  },
-  activeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#00FF88',
-  },
-  activeText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 12,
-    color: '#00FF88',
-  },
-  activeUntil: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#888',
-  },
-  perksTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 12,
-    color: '#FFD700',
-    marginBottom: 16,
-  },
-  perksList: { gap: 12, marginBottom: 24 },
+  dayDotActive: { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' },
+  dayText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#555' },
+  dayTextActive: { color: '#FFD700' },
+  perksTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFD700', marginBottom: 12 },
   perkCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.05)',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.2)',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 14, marginBottom: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
+  perkLocked: { opacity: 0.5 },
   perkIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center',
   },
   perkInfo: { flex: 1 },
-  perkTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 9,
-    color: '#FFD700',
-    marginBottom: 4,
+  perkTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#FFF', marginBottom: 4 },
+  perkDesc: { fontFamily: 'PressStart2P_400Regular', fontSize: 6, color: '#888' },
+  howToSection: {
+    backgroundColor: 'rgba(255,215,0,0.05)', borderRadius: 16, padding: 16, marginTop: 16,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.1)',
   },
-  perkDesc: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 7,
-    color: '#AAA',
+  howToTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFD700', marginBottom: 16 },
+  howToStep: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  stepNum: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,215,0,0.2)', justifyContent: 'center', alignItems: 'center',
   },
-  comparisonSection: { marginBottom: 24 },
-  comparisonTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 10,
-    color: '#FFF',
-    marginBottom: 12,
-  },
-  comparisonTable: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  comparisonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  comparisonLabel: {
-    flex: 1,
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 7,
-    color: '#AAA',
-  },
-  comparisonFree: {
-    width: 60,
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#888',
-    textAlign: 'center',
-  },
-  comparisonVip: {
-    width: 60,
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#FFD700',
-    textAlign: 'center',
-  },
-  subscribeButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  subscribeGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 12,
-  },
-  subscribeText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 12,
-    color: '#0D0D0D',
-  },
-  extendButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#FFD700',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  extendText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 10,
-    color: '#FFD700',
-  },
-  bottomPadding: { height: 40 },
+  stepNumText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFD700' },
+  stepText: { fontFamily: 'PressStart2P_400Regular', fontSize: 6, color: '#CCC', flex: 1, lineHeight: 12 },
 });

@@ -78,11 +78,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return user
 
 def is_vip_active(user: dict) -> bool:
-    """Check if user has active VIP subscription"""
-    if not user.get("vip_until"):
-        return False
-    vip_until = datetime.fromisoformat(user["vip_until"])
-    return datetime.utcnow() < vip_until
+    """Check if user has active VIP - earned through 7+ day streak"""
+    return user.get("streak", 0) >= 7
 
 def get_vip_perks(user: dict) -> dict:
     """Get VIP perks for user"""
@@ -446,18 +443,15 @@ BADGES = [
 # ============== VIP PERKS INFO ==============
 
 VIP_INFO = {
-    "price": 5.00,
-    "currency": "USD",
-    "period": "month",
+    "how_to_earn": "Maintain a 7-day streak to earn VIP status!",
+    "streak_required": 7,
     "perks": [
         {"icon": "heart", "title": "10 HEARTS", "description": "Double the lives to keep learning"},
         {"icon": "flash", "title": "1.5X XP", "description": "Level up 50% faster"},
         {"icon": "bulb", "title": "5 HINTS/LESSON", "description": "More help when you're stuck"},
         {"icon": "snow", "title": "2 STREAK FREEZES/WEEK", "description": "Protect your streak"},
-        {"icon": "close-circle", "title": "AD-FREE", "description": "No interruptions"},
         {"icon": "star", "title": "EXCLUSIVE BADGES", "description": "VIP-only achievements"},
         {"icon": "rocket", "title": "EARLY ACCESS", "description": "New features first"},
-        {"icon": "headset", "title": "PRIORITY SUPPORT", "description": "Get help faster"},
     ]
 }
 

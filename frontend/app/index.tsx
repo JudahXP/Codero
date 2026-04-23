@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,9 +11,7 @@ const { width } = Dimensions.get('window');
 export default function WelcomeScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     if (!loading && user) {
@@ -22,19 +20,7 @@ export default function WelcomeScreen() {
   }, [user, loading]);
 
   useEffect(() => {
-    // Pulse animation for logo
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
-
-    // Fade-in content
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
-    ]).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
   }, []);
 
   if (loading) {
@@ -47,60 +33,44 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           {/* Logo Section */}
           <View style={styles.logoSection}>
-            <Animated.View style={[styles.logoContainer, { transform: [{ scale: pulseAnim }] }]}>
-              <Ionicons name="code-slash" size={56} color="#00FF88" />
-            </Animated.View>
+            <View style={styles.logoContainer}>
+              <Ionicons name="code-slash" size={50} color="#00FF88" />
+            </View>
             <Text style={styles.title}>CODERO</Text>
             <Text style={styles.subtitle}>LEARN TO CODE</Text>
             <Text style={styles.tagline}>THE FUN WAY TO MASTER PROGRAMMING</Text>
           </View>
 
-          {/* Features Grid */}
-          <Animated.View style={[styles.featuresContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          {/* Features */}
+          <View style={styles.featuresContainer}>
             <View style={styles.featureRow}>
               <View style={styles.featureCard}>
-                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(0, 255, 136, 0.12)' }]}>
-                  <Ionicons name="globe" size={22} color="#00FF88" />
-                </View>
+                <Ionicons name="globe" size={24} color="#00FF88" />
                 <Text style={styles.featureTitle}>20 LANGUAGES</Text>
-                <Text style={styles.featureDesc}>PYTHON, JS, GO, RUST, ZIG & MORE</Text>
               </View>
               <View style={styles.featureCard}>
-                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(255, 215, 0, 0.12)' }]}>
-                  <Ionicons name="trophy" size={22} color="#FFD700" />
-                </View>
+                <Ionicons name="trophy" size={24} color="#FFD700" />
                 <Text style={styles.featureTitle}>EARN XP</Text>
-                <Text style={styles.featureDesc}>LEVEL UP & UNLOCK BADGES</Text>
               </View>
             </View>
             <View style={styles.featureRow}>
               <View style={styles.featureCard}>
-                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(255, 107, 107, 0.12)' }]}>
-                  <Ionicons name="game-controller" size={22} color="#FF6B6B" />
-                </View>
+                <Ionicons name="game-controller" size={24} color="#FF6B6B" />
                 <Text style={styles.featureTitle}>PLAY GAMES</Text>
-                <Text style={styles.featureDesc}>BUG HUNTER, PUZZLES & MORE</Text>
               </View>
               <View style={styles.featureCard}>
-                <View style={[styles.featureIconBg, { backgroundColor: 'rgba(0, 191, 255, 0.12)' }]}>
-                  <Ionicons name="flame" size={22} color="#00BFFF" />
-                </View>
+                <Ionicons name="flame" size={24} color="#00BFFF" />
                 <Text style={styles.featureTitle}>STREAKS</Text>
-                <Text style={styles.featureDesc}>DAILY GOALS & CHALLENGES</Text>
               </View>
             </View>
-          </Animated.View>
+          </View>
 
-          {/* Stats Highlight */}
+          {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statBubble}>
               <Text style={styles.statNumber}>600+</Text>
@@ -118,12 +88,11 @@ export default function WelcomeScreen() {
             </View>
           </View>
 
-          {/* Buttons */}
+          {/* Buttons - Using Pressable for better web touch handling */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.playButton}
+            <Pressable
+              style={({ pressed }) => [styles.playButton, pressed && styles.buttonPressed]}
               onPress={() => router.push('/register')}
-              activeOpacity={0.8}
             >
               <LinearGradient
                 colors={['#00FF88', '#00CC6A']}
@@ -134,37 +103,37 @@ export default function WelcomeScreen() {
                 <Ionicons name="rocket" size={22} color="#0D0D0D" />
                 <Text style={styles.playButtonText}>GET STARTED</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
-              style={styles.loginButton}
+            <Pressable
+              style={({ pressed }) => [styles.loginButton, pressed && styles.loginPressed]}
               onPress={() => router.push('/login')}
-              activeOpacity={0.8}
             >
               <Ionicons name="log-in" size={18} color="#00FF88" />
               <Text style={styles.loginButtonText}>I HAVE AN ACCOUNT</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           <Text style={styles.footerText}>FREE TO START - NO CREDIT CARD NEEDED</Text>
-        </ScrollView>
+        </Animated.View>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0D0D0D',
   },
   safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  content: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingTop: 16,
+    paddingBottom: 16,
     justifyContent: 'space-between',
   },
   loadingContainer: {
@@ -181,79 +150,62 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    paddingTop: 16,
-    marginBottom: 24,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 24,
+    width: 90,
+    height: 90,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 255, 136, 0.1)',
     borderWidth: 3,
     borderColor: '#00FF88',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 28,
+    fontSize: 26,
     color: '#00FF88',
     textShadowColor: '#00FF88',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   subtitle: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 11,
+    fontSize: 10,
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   tagline: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 7,
+    fontSize: 6,
     color: '#888888',
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 12,
   },
   featuresContainer: {
-    gap: 10,
-    marginBottom: 20,
+    gap: 8,
   },
   featureRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   featureCard: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
-    gap: 8,
-  },
-  featureIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 6,
   },
   featureTitle: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
+    fontSize: 7,
     color: '#FFFFFF',
     textAlign: 'center',
-  },
-  featureDesc: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 5,
-    color: '#888888',
-    textAlign: 'center',
-    lineHeight: 10,
   },
   statsRow: {
     flexDirection: 'row',
@@ -261,44 +213,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 255, 136, 0.05)',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 136, 0.1)',
-    marginBottom: 24,
   },
   statBubble: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   statNumber: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 14,
+    fontSize: 13,
     color: '#00FF88',
   },
   statLabel: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 6,
+    fontSize: 5,
     color: '#888888',
   },
   statDivider: {
     width: 1,
-    height: 28,
+    height: 24,
     backgroundColor: 'rgba(0, 255, 136, 0.2)',
   },
   buttonContainer: {
     gap: 12,
-    marginBottom: 16,
   },
   playButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#00FF88',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   playButtonGradient: {
     flexDirection: 'row',
@@ -323,6 +272,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+  loginPressed: {
+    opacity: 0.7,
+    backgroundColor: 'rgba(0, 255, 136, 0.05)',
+  },
   loginButtonText: {
     fontFamily: 'PressStart2P_400Regular',
     fontSize: 9,
@@ -330,7 +283,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontFamily: 'PressStart2P_400Regular',
-    fontSize: 6,
+    fontSize: 5,
     color: '#555555',
     textAlign: 'center',
   },
