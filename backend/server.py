@@ -224,6 +224,12 @@ def send_verification_email(to_email: str, code: str):
     msg["From"] = smtp_user
     msg["To"] = to_email
     msg.set_content(f"Your Codero verification code is {code}. It expires in 10 minutes.")
+    msg.add_alternative(build_branded_email_html(
+        "Your Codero verification code",
+        f"Your secure login code is: {code}\n\nThis code expires in 10 minutes. If you did not request it, you can ignore this email.",
+        "Open Codero Verification",
+        f"{APP_PUBLIC_URL}/verify-email",
+    ), subtype="html")
     context = ssl.create_default_context()
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -1498,6 +1504,20 @@ async def login(credentials: UserLogin, background_tasks: BackgroundTasks):
     }
     
     await db.users.update_one({"id": user["id"]}, {"$set": update_fields})
+    login_code = f"{random.randint(100000, 999999)}"
+    await db.verification_codes.update_one(
+        {"email": user["email"].lower(), "used": False},
+        {"$set": {
+            "email": user["email"].lower(),
+            "code_hash": hash_password(login_code),
+            "expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+            "used": False,
+            "created_at": datetime.utcnow().isoformat(),
+        }},
+        upsert=True,
+    )
+    background_tasks.add_task(send_verification_email, user["email"].lower(), login_code)
+
     
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user["id"]})

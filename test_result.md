@@ -363,6 +363,9 @@ metadata:
   - agent: "main"
     message: "Codero V1.7 Phase 1 implemented: username-or-email login, duplicate username blocking, admin tag for Judahxp/judahxpbusiness@gmail.com, branded HTML emails with buttons, verification code screen/flow, removed user-facing email template editor, tutorial unit generation/enforcement, empty starter for fix-broken-code, lesson/practice wrong-answer review response, favorite friends API/UI, friend search improvements, settings no longer refresh-kicks users, and added visible review panel after lesson completion. Please backend-test auth, verification, tutorial gating, wrong-answer review, favorite friends, and branded email behavior."
 
+  - agent: "main"
+    message: "After user requested frontend testing plus stricter login verification and better email embeds: login now creates/sends a verification code, verification emails use branded HTML cards with a working /verify-email button, verification screen no longer allows skip-to-home, and frontend export passes. Please retest backend login verification-code send and frontend V1.7 UI/buttons."
+
     priority: "high"
     needs_retesting: false
     status_history:
@@ -624,3 +627,69 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "CODERO V1.7 PHASE 1 BACKEND TESTING COMPLETE - 48/49 TESTS PASSED (98.0% SUCCESS RATE). Comprehensive testing of all 10 Phase 1 requirements completed successfully. PASSED TESTS: 1) ✅ Fresh user registration (8/8): Token/user response, tutorial lessons available, verification code queued without exposure, gems=10, hearts=5, settings present. 2) ✅ Duplicate registration (4/4): Case-insensitive username/email validation with clear 400 error messages. 3) ✅ Login with email and username (3/3): Both methods work for same user. 4) ✅ Admin behavior (2/2): judahxpbusiness@gmail.com shows is_admin=true, admin_tag='ADMIN'. 5) ✅ Tutorial gating (5/5): 403 before tutorial completion, allowed after, clear error message. 6) ✅ Wrong answer review (5/5): Response includes wrong_review with question/expected/explanation, GET /review/wrong-answers returns saved items. 7) ✅ Fix-broken-code starter (2/2): Empty starter string as required. 8) ✅ Friends system (8/8): Case-insensitive search, add friend, toggle favorite ON/OFF, favorite persists in GET /friends. 9) ✅ Settings persistence (6/6): Updates persist, defaults NOT dropped, verified via GET /settings and GET /auth/me. 10) ✅ Email endpoints (7/7): Verification code queued, branded HTML emails sent, SMTP secrets NOT exposed, templates accessible. MINOR NOTE: Admin login test initially failed because admin account didn't exist with test password. Created admin account (JudahxpAdmin / judahxpbusiness@gmail.com) and verified admin behavior working correctly. BACKEND LOGS CONFIRM: Gmail SMTP emails sent successfully for registration, login, verification codes, and test emails. All Phase 1 backend requirements verified and production-ready. Test user: phase1test_1779469608@codero.com."
+
+
+  - agent: "testing"
+    message: "V1.7 AUTH/EMAIL RETEST COMPLETE - 9/9 TESTS PASSED (100% SUCCESS RATE). Quick backend retest for latest V1.7 auth/email changes completed successfully. VERIFIED: 1) ✅ POST /api/auth/login with valid email returns token/user AND creates/queues verification code email (code NOT exposed in response, backend logs confirm 'Verification email sent'). 2) ✅ POST /api/auth/login with valid username also returns token/user AND creates/queues verification code (username-or-email login working correctly). 3) ✅ Verification email uses Gmail SMTP without crashing after branded HTML update (no SMTP errors in backend logs, branded HTML emails sent successfully). 4) ✅ POST /api/auth/verify-email works with current DB code (verification code stored with hashed code, expires_at timestamp, used=false flag; endpoint validates code and marks as used). 5) ✅ Registration duplicate username validation returns 400 with clear message 'Username is already taken'. 6) ✅ Registration duplicate email validation returns 400 with clear message 'Email already has an account'. All V1.7 auth/email requirements verified and working correctly. Test user: v17test_1779473101@codero.com."
+
+backend:
+  - task: "V1.7 Latest: Login Verification Code Creation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Login verification code creation working perfectly (3/3 tests passed). POST /api/auth/login with email returns token/user AND creates verification code in database (stored with code_hash, expires_at, used=false). POST /api/auth/login with username also works correctly (username-or-email login functional). Verification code NOT exposed in API response (secure). Backend logs confirm 'Verification email sent to [user]' for each login. Verification codes persist in MongoDB with proper structure."
+
+  - task: "V1.7 Latest: SMTP Email Delivery with Branded HTML"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "SMTP email delivery working correctly after branded HTML update (2/2 tests passed). Verification emails sent via Gmail SMTP without crashes (backend logs show 'Verification email sent to [user]'). No SMTP errors in backend logs (no SMTPAuthenticationError, SMTPException, or delivery failures). Branded HTML emails use build_branded_email_html function with gradient header, buttons, and responsive design. SMTP credentials (codero.devs@gmail.com) working correctly."
+
+  - task: "V1.7 Latest: Verify Email Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Verify email endpoint working correctly (1/1 test passed). POST /api/auth/verify-email validates verification code from database. Verification codes stored with code_hash (hashed with SHA256), expires_at timestamp (10 minutes), and used=false flag. Endpoint checks code_hash against hashed input code, validates expiry, marks code as used, and updates user email_verified status. Returns 200 with email_verified=true on success, 400 with clear error messages on failure (no active code, expired, invalid code)."
+
+  - task: "V1.7 Latest: Duplicate Registration Validation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Duplicate registration validation working correctly (2/2 tests passed). Duplicate username returns 400 with clear message 'Username is already taken' (case-insensitive validation). Duplicate email returns 400 with clear message 'Email already has an account' (case-insensitive validation). Both validations user-friendly and production-ready."
+
+metadata:
+  created_by: "testing_agent"
+  version: "4.1"
+  test_sequence: 5
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "V1.7 Latest Auth/Email Changes Verified"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"

@@ -73,9 +73,7 @@ export default function VerifyEmailScreen() {
             <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary }]} onPress={resend} disabled={loading}>
               <Text style={[styles.secondaryText, { color: colors.primary }]}>RESEND CODE</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.replace('/home')}>
-              <Text style={[styles.skipText, { color: colors.textMuted }]}>I’ll verify later</Text>
-            </TouchableOpacity>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Verification is required before continuing. Check your email for the Codero code.</Text>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
