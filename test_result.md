@@ -240,6 +240,24 @@ backend:
         agent: "testing"
         comment: "Login endpoint ObjectId bug successfully fixed. POST /auth/login now works correctly without MongoDB ObjectId serialization errors. Users can login and receive proper token and user data response."
 
+  - task: "Gmail SMTP Email Verification"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "SMTP email delivery failed due to invalid Gmail credentials (SMTPAuthenticationError: 535 Bad Credentials). Endpoint structure correct, verification codes queued in database, but actual email delivery not working."
+      - working: "NA"
+        agent: "main"
+        comment: "User provided updated Gmail SMTP credentials (codero.devs@gmail.com / proszfeuvepexogn). backend/.env updated, backend restarted. send_verification_email hardened with try-except to catch SMTP errors and log them instead of raising background task exceptions. Need retesting."
+      - working: true
+        agent: "testing"
+        comment: "Gmail SMTP verification now working successfully. POST /api/auth/send-verification-code returns 200 OK with secure response (code not exposed). Backend logs confirm successful SMTP authentication and email delivery: 'Verification email sent to codero.devs@gmail.com' and 'Verification email sent to smtptest_20260522@codero.com'. No SMTPAuthenticationError with new credentials. Verification codes properly stored in MongoDB. Backend remains healthy after requests. Error handling working correctly: send_verification_email catches SMTPException and logs errors. Previous SMTPAuthenticationError (535 Bad Credentials) resolved. Email verification flow is production-ready."
+
 frontend:
   - task: "Frontend Testing"
     implemented: false
@@ -339,7 +357,13 @@ agent_communication:
   - agent: "main"
     message: "Implemented backend changes for Phase 1: Gmail SMTP verification-code endpoints, passkey/Google-ready security options, profile customization + 3 displayed badges persistence, wrong-answer review storage, continue-learning endpoint, secure simulated /code/check endpoint, enriched lessons with predict-output/fix-code/write-code/drag-drop challenge types, friend username suggestions, and authenticated friend/self-only leaderboard. Please test these backend API contracts plus existing auth/data persistence."
 
+  - agent: "main"
+    message: "User provided updated Gmail SMTP credentials. backend/.env was updated, backend restarted, and send_verification_email was hardened to catch SMTP delivery errors instead of raising background task exceptions. Please retest /api/auth/send-verification-code delivery behavior and verify no SMTPAuthenticationError appears with the new credentials."
+
     message: "BASELINE FRONTEND UI TESTING COMPLETE. Comprehensive testing performed at https://codero-stack.preview.emergentagent.com with test user uitester@codero.com. All core features working: Welcome page navigation (✅), Login/auth flow (✅), Home dashboard with stats/quick actions/languages (✅), Data persistence after refresh (✅), Games hub with 3 games (✅), Bug Hunter game screen (✅), Friends page with add-friend input (✅), Leaderboard with podium display (✅ shows generated users), Profile page with stats/menu (✅), Language navigation (✅), Mobile (390x844) and Desktop (1920x800) responsiveness (✅). ISSUES FOUND: 1) Register button requires scrolling to be visible at 1920x800 (minor UI issue). 2) Friends page: No username suggestions (feature not implemented). 3) Profile: Badge customization/display not implemented (feature missing). 4) Leaderboard shows generated/random users (FINAL1, DEBUG1, JRDHMK, HEALTHTEST_20260522_001033, UITESTER). All navigation buttons responsive and clickable. Data saves correctly through UI. No critical bugs blocking core functionality."
 
   - agent: "testing"
     message: "PHASE 1 BACKEND TESTING COMPLETE - ALL TESTS PASSED (13/13, 100%). Comprehensive testing of Phase 1 enhancements completed successfully. Test results: 1) Auth with defaults: Fresh user registration includes profile defaults (display_name, bio, avatar_color, display_badges) and auth_methods (password=true, email_verified=false, passkey_ready=true, google_ready=true). 2) Auth flow: Login, /auth/me, and unauthorized access rejection all working correctly. 3) Profile persistence: PUT /api/profile updates display_name and bio, persisted via /auth/me. PUT /api/profile/display-badges validates max 3 badges and rejects unearned badges. 4) Continue learning: GET /api/continue-learning returns valid language_id and lesson_id; lesson endpoint returns that lesson. 5) Enriched lesson types: Lessons include diverse challenge types (predict_output, fill_blank, fix_broken_code, write_code, drag_drop, multiple_choice) with no serialization issues. 6) Code check & wrong answers: POST /api/code/check with wrong answer returns correct=false, simple_explanation present, expected_answer gated. Wrong answers saved to database. GET /api/review/wrong-answers retrieves saved items. POST /api/review/wrong-answers/{id}/reviewed marks as reviewed. 7) Lesson completion: POST /api/progress/complete persists progress with enriched challenge types. 8) Friends suggestions: GET /api/friends/suggest?q=<prefix> returns suggestions excluding self and existing friends. POST /api/friends/add adds friend; suggestions then exclude friend. 9) Leaderboard: GET /api/leaderboard requires auth (401/403 without token) and returns only self and friends, not arbitrary users. 10) Email verification: POST /api/auth/send-verification-code queues code without exposing it. GET /api/auth/security-options shows passkeys_ready=true and google_sign_in_ready=true. NOTE: SMTP email delivery fails due to invalid Gmail credentials (SMTPAuthenticationError), but endpoint structure is correct and code is queued in database. All Phase 1 backend API contracts working correctly and ready for frontend integration."
+
+  - agent: "testing"
+    message: "GMAIL SMTP VERIFICATION RETEST COMPLETE - ALL TESTS PASSED (3/3, 100%). Retested POST /api/auth/send-verification-code with updated Gmail SMTP credentials (codero.devs@gmail.com / proszfeuvepexogn). Test results: 1) Endpoint returns 200 OK with proper response structure (message, email, expires_at). 2) Verification code NOT exposed in response (secure). 3) Backend logs confirm successful SMTP authentication and email delivery: 'INFO:server:Verification email sent to codero.devs@gmail.com' and 'INFO:server:Verification email sent to smtptest_20260522@codero.com'. 4) No SMTPAuthenticationError with new credentials. 5) Verification codes properly stored in MongoDB with code_hash, expires_at, and used=false. 6) Backend remains healthy after requests (GET /api/ returns 200 OK). 7) Error handling working correctly: send_verification_email catches SMTPException and logs errors instead of raising background task exceptions. CRITICAL FINDING: Gmail SMTP authentication now working successfully. Previous SMTPAuthenticationError (535 Bad Credentials) resolved with new credentials. Email verification flow is production-ready."

@@ -201,9 +201,15 @@ def send_verification_email(to_email: str, code: str):
     msg["To"] = to_email
     msg.set_content(f"Your Codero verification code is {code}. It expires in 10 minutes.")
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logger.info("Verification email sent to %s", to_email)
+    except smtplib.SMTPException as exc:
+        logger.error("Verification email delivery failed for %s: %s", to_email, exc)
+    except Exception as exc:
+        logger.error("Unexpected verification email error for %s: %s", to_email, exc)
 
 def get_vip_perks(user: dict) -> dict:
     """Get VIP perks for user"""
