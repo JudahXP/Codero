@@ -33,8 +33,8 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await login(email.trim(), password);
-      router.replace('/verify-email');
+      const loggedInUser = await login(email.trim(), password);
+      router.replace(loggedInUser?.email_verified ? '/home' : '/verify-email');
     } catch (error: any) {
       Alert.alert('ERROR', error.response?.data?.detail || 'Login failed');
     } finally {
