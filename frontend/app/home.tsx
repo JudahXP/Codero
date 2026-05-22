@@ -283,6 +283,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P_400Regular',
     fontSize: 8,
     color: '#00FF88',
+  },
   continueLearningCard: {
     marginHorizontal: 20,
     marginBottom: 18,
@@ -324,8 +325,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P_400Regular',
     fontSize: 7,
     color: '#888',
-  },
-
   },
   xpText: {
     fontFamily: 'PressStart2P_400Regular',
