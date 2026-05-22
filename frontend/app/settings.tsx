@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, TextInput } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../src/services/api';
 import { useAppSettings, AppSettings } from '../src/context/SettingsContext';
 import { safeBack } from '../src/utils/navigation';
 
@@ -12,16 +11,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { settings, colors, gradient, fontScale, updateSetting, playSound } = useAppSettings();
   const [saving, setSaving] = useState(false);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState('login');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-
-  useEffect(() => { fetchTemplates(); }, []);
-  useEffect(() => {
-    const t = templates.find((template) => template.event === selectedTemplate);
-    if (t) { setSubject(t.subject); setBody(t.body); }
-  }, [selectedTemplate, templates]);
 
   const safeUpdate = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     try {
@@ -34,38 +23,6 @@ export default function SettingsScreen() {
       Alert.alert('ERROR', 'Failed to save setting');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const fetchTemplates = async () => {
-    try {
-      const response = await api.get('/email/templates');
-      setTemplates(response.data);
-    } catch (error) {
-      setTemplates([]);
-    }
-  };
-
-  const saveTemplate = async () => {
-    try {
-      await api.put(`/email/templates/${selectedTemplate}`, { subject, body });
-      await fetchTemplates();
-      playSound('success');
-      Alert.alert('SAVED', 'Email template saved.');
-    } catch (error: any) {
-      playSound('error');
-      Alert.alert('ERROR', error.response?.data?.detail || 'Template save failed');
-    }
-  };
-
-  const sendTest = async () => {
-    try {
-      await api.post('/email/send-test', { event: selectedTemplate });
-      playSound('notify');
-      Alert.alert('QUEUED', 'Test email has been queued.');
-    } catch (error: any) {
-      playSound('error');
-      Alert.alert('ERROR', error.response?.data?.detail || 'Could not send test email');
     }
   };
 
@@ -143,25 +100,8 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.emailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-            <Text style={[styles.sectionTitle, { color: colors.primary }]}>EMAIL TEMPLATES</Text>
-            <Text style={[styles.settingDesc, { color: colors.textMuted }]}>Use variables: {'{username}'}, {'{email}'}, {'{time}'}, {'{vip_until}'}</Text>
-            <View style={styles.templateTabs}>
-              {['login', 'join', 'vip', 'daily', 'test'].map((event) => (
-                <TouchableOpacity key={event} style={[styles.templateTab, selectedTemplate === event && { backgroundColor: colors.primary }]} onPress={() => setSelectedTemplate(event)}>
-                  <Text style={[styles.templateTabText, { color: selectedTemplate === event ? colors.primaryText : colors.text }]}>{event.toUpperCase()}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput style={[styles.emailInput, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]} value={subject} onChangeText={setSubject} placeholder="Email subject" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[styles.emailInput, styles.emailBody, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]} value={body} onChangeText={setBody} placeholder="Email body" placeholderTextColor={colors.textMuted} multiline />
-            <View style={styles.emailButtons}>
-              <TouchableOpacity style={[styles.emailButton, { backgroundColor: colors.primary }]} onPress={saveTemplate}>
-                <Text style={[styles.emailButtonText, { color: colors.primaryText }]}>SAVE TEMPLATE</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.emailButton, { backgroundColor: colors.info }]} onPress={sendTest}>
-                <Text style={[styles.emailButtonText, { color: '#FFF' }]}>SEND TEST</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>BRANDED EMAILS</Text>
+            <Text style={[styles.settingDesc, { color: colors.textMuted }]}>Codero sends polished game-style email cards with working buttons. Users can control what they receive here; templates are managed by the app owner only.</Text>
           </View>
 
           {saving && <Text style={[styles.savingText, { color: colors.primary }]}>SAVING...</Text>}

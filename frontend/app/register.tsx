@@ -46,7 +46,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(username.trim(), email.trim(), password);
-      router.replace('/home');
+      router.replace('/verify-email');
     } catch (error: any) {
       Alert.alert('ERROR', error.response?.data?.detail || 'Registration failed');
     } finally {

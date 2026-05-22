@@ -17,10 +17,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../src/services/api';
 
 interface Friend {
+  id: string;
   username: string;
+  display_name?: string;
   xp: number;
   level: number;
   streak: number;
+  favorite?: boolean;
+  is_admin?: boolean;
+  admin_tag?: string | null;
 }
 
 export default function FriendsScreen() {
@@ -88,6 +93,16 @@ export default function FriendsScreen() {
       setShowAdd(false);
       fetchFriends();
     } catch (error: any) {
+
+  const toggleFavorite = async (friend: Friend) => {
+    try {
+      const response = await api.post(`/friends/${friend.id}/favorite`);
+      setFriends((prev) => prev.map((item) => item.id === friend.id ? { ...item, favorite: response.data.favorite } : item));
+    } catch (error: any) {
+      Alert.alert('ERROR', error.response?.data?.detail || 'Could not favorite friend');
+    }
+  };
+
       Alert.alert('ERROR', error.response?.data?.detail || 'Failed to add friend');
     } finally {
       setAdding(false);
@@ -190,10 +205,17 @@ export default function FriendsScreen() {
                 <View style={styles.friendLeft}>
                   <View style={styles.friendAvatar}>
                     <Ionicons name="person" size={24} color="#00FF88" />
+                  <TouchableOpacity style={styles.favoriteButton} onPress={() => toggleFavorite(friend)}>
+                    <Ionicons name={friend.favorite ? 'star' : 'star-outline'} size={24} color="#FFD700" />
+                  </TouchableOpacity>
+
                   </View>
                   <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{friend.username.toUpperCase()}</Text>
-                    <Text style={styles.friendLevel}>LEVEL {friend.level}</Text>
+                    <View style={styles.friendNameRow}>
+                      <Text style={styles.friendName}>{(friend.display_name || friend.username).toUpperCase()}</Text>
+                      {friend.is_admin && <Text style={styles.adminMiniTag}>ADMIN</Text>}
+                    </View>
+                    <Text style={styles.friendLevel}>@{friend.username} • LEVEL {friend.level}</Text>
                   </View>
                 </View>
                 <View style={styles.friendRight}>
@@ -321,6 +343,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+  friendNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  adminMiniTag: { fontFamily: 'PressStart2P_400Regular', fontSize: 6, color: '#0D0D0D', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 },
+  favoriteButton: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     paddingHorizontal: 16,

@@ -246,6 +246,20 @@ export default function LessonScreen() {
               )}
             </View>
 
+            {results.wrong_review?.length > 0 && (
+              <ScrollView style={styles.reviewPanel} contentContainerStyle={styles.reviewContent}>
+                <Text style={styles.reviewTitle}>REVIEW MISSED QUESTIONS</Text>
+                {results.wrong_review.map((item: any, index: number) => (
+                  <View key={index} style={styles.reviewItem}>
+                    <Text style={styles.reviewQuestion}>{index + 1}. {item.question}</Text>
+                    <Text style={styles.reviewAnswer}>Learn: {item.explanation}</Text>
+                    <Text style={styles.reviewAnswer}>Answer: {Array.isArray(item.expected_answer) ? item.expected_answer.join(' / ') : String(item.expected_answer)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+
             <TouchableOpacity
               style={styles.continueButton}
               onPress={() => safeBack(router, '/home')}
@@ -695,6 +709,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     alignSelf: 'center',
+  reviewPanel: { width: '100%', maxHeight: 220, marginTop: 16, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.35)', backgroundColor: 'rgba(255, 215, 0, 0.08)' },
+  reviewContent: { padding: 14, gap: 10 },
+  reviewTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFD700', marginBottom: 4 },
+  reviewItem: { gap: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.12)' },
+  reviewQuestion: { fontSize: 13, fontWeight: '800', color: '#FFF', lineHeight: 18 },
+  reviewAnswer: { fontSize: 12, color: '#DDD', lineHeight: 17 },
+
   },
   hintButtonText: {
     fontFamily: 'PressStart2P_400Regular',

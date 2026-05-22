@@ -68,6 +68,12 @@ export default function ProfileScreen() {
               <Ionicons name="person" size={48} color={colors.primary} />
             </View>
             <Text style={[styles.username, { color: colors.text, fontSize: 16 * fontScale }]}>{(user?.profile?.display_name || user?.username || 'CODER').toUpperCase()}</Text>
+            {user?.is_admin && (
+              <View style={[styles.adminTag, { backgroundColor: colors.warning }]}>
+                <Ionicons name="shield-checkmark" size={14} color="#0D0D0D" />
+                <Text style={styles.adminTagText}>ADMIN</Text>
+              </View>
+            )}
             <Text style={[styles.email, { color: colors.textMuted }]}>{user?.email}</Text>
             {!!user?.profile?.bio && <Text style={[styles.bioText, { color: colors.textMuted }]}>{user.profile.bio}</Text>}
             <View style={styles.displayBadgesRow}>
@@ -171,6 +177,9 @@ const styles = StyleSheet.create({
   avatarContainer: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   username: { fontFamily: 'PressStart2P_400Regular', marginBottom: 8, textAlign: 'center' },
   email: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, textAlign: 'center' },
+  adminTag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, marginBottom: 8 },
+  adminTagText: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, color: '#0D0D0D' },
+
   bioText: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 10 },
   displayBadgesRow: { flexDirection: 'row', gap: 8, marginTop: 16, width: '100%' },
   displayBadgeSlot: { flex: 1, minHeight: 64, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 6 },

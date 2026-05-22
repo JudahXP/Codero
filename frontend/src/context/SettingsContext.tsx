@@ -94,7 +94,7 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
 
   useEffect(() => {
@@ -131,7 +131,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem('app_settings', JSON.stringify(merged));
     if (user) {
       await api.put('/settings', { settings: merged });
-      await refreshUser();
     }
   };
 

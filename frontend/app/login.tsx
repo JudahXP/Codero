@@ -34,7 +34,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      router.replace('/home');
+      router.replace('/verify-email');
     } catch (error: any) {
       Alert.alert('ERROR', error.response?.data?.detail || 'Login failed');
     } finally {
@@ -68,11 +68,10 @@ export default function LoginScreen() {
                 <Ionicons name="mail" size={20} color="#00FF88" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="EMAIL"
+                  placeholder="EMAIL OR USERNAME"
                   placeholderTextColor="#666666"
                   value={email}
                   onChangeText={setEmail}
-                  keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>

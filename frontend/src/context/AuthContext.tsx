@@ -27,6 +27,9 @@ interface User {
     theme?: 'dark' | 'light';
   };
   email_verified?: boolean;
+  is_admin?: boolean;
+  admin_tag?: string | null;
+
   profile?: {
     display_name?: string;
     bio?: string;

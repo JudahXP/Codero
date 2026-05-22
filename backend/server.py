@@ -98,6 +98,20 @@ class EmailTestRequest(BaseModel):
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+
+ADMIN_EMAIL = "judahxpbusiness@gmail.com"
+ADMIN_USERNAME = "Judahxp"
+APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "https://codero-stack.preview.emergentagent.com")
+
+def is_admin_user(user: dict) -> bool:
+    return (user.get("email", "").lower() == ADMIN_EMAIL.lower()) or (user.get("username", "").lower() == ADMIN_USERNAME.lower())
+
+def normalize_username(username: str) -> str:
+    return (username or "").strip()
+
+def username_regex(username: str):
+    return re.compile(f"^{re.escape(normalize_username(username))}$", re.IGNORECASE)
+
 def generate_token() -> str:
     return secrets.token_urlsafe(32)
 
@@ -133,6 +147,8 @@ def public_user(user: dict) -> dict:
         "google_ready": True,
     })
     clean.setdefault("email_verified", clean.get("auth_methods", {}).get("email_verified", False))
+    clean["is_admin"] = is_admin_user(clean)
+    clean["admin_tag"] = "ADMIN" if clean["is_admin"] else None
     clean["settings"] = merge_settings(clean.get("settings", {}))
     clean["is_vip"] = is_vip_active(clean)
     clean["vip_perks"] = get_vip_perks(clean)
@@ -271,6 +287,26 @@ def render_template(text: str, context: dict) -> str:
         rendered = rendered.replace("{" + key + "}", str(value))
     return rendered
 
+def build_branded_email_html(subject: str, body: str, button_text: str = "Open Codero", button_url: str = APP_PUBLIC_URL) -> str:
+    safe_body = body.replace("\n", "<br />")
+    return f"""
+    <div style="margin:0;padding:0;background:#0D0D0D;font-family:Arial,Helvetica,sans-serif;color:#FFFFFF;">
+      <div style="max-width:620px;margin:0 auto;padding:32px 18px;">
+        <div style="background:linear-gradient(135deg,#0D0D0D,#1A1A2E);border:1px solid rgba(0,255,136,.35);border-radius:22px;overflow:hidden;box-shadow:0 16px 45px rgba(0,0,0,.35);">
+          <div style="padding:26px 24px;background:linear-gradient(90deg,#00FF88,#00BFFF);color:#0D0D0D;">
+            <div style="font-size:12px;font-weight:900;letter-spacing:2px;text-transform:uppercase;">CODERO</div>
+            <h1 style="margin:10px 0 0;font-size:24px;line-height:1.25;font-weight:900;">{subject}</h1>
+          </div>
+          <div style="padding:28px 24px;">
+            <div style="font-size:16px;line-height:1.7;color:#E5E7EB;">{safe_body}</div>
+            <a href="{button_url}" style="display:inline-block;margin-top:26px;background:#00FF88;color:#0D0D0D;text-decoration:none;font-weight:900;padding:14px 20px;border-radius:14px;">{button_text}</a>
+            <p style="margin-top:26px;color:#8B93A7;font-size:12px;line-height:1.5;">If the button does not work, copy this link: <br /><span style="color:#00BFFF;">{button_url}</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
 def send_email_message(to_email: str, subject: str, body: str):
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASS")
@@ -282,6 +318,7 @@ def send_email_message(to_email: str, subject: str, body: str):
     msg["From"] = smtp_user
     msg["To"] = to_email
     msg.set_content(body)
+    msg.add_alternative(build_branded_email_html(subject, body), subtype="html")
     context = ssl.create_default_context()
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -1125,7 +1162,7 @@ def generate_exercises(language_id: str, topic: str, unit: int) -> List[dict]:
             {"type": "multiple_choice", "question": f"Why is {topic} important?", "options": ["Improves code quality", "Not important", "Only for experts", "Rarely used"], "correct": 0, "explanation": "It's a building block for more complex features."},
             {"type": "code", "question": f"Implement a simple {topic}", "starter": "", "solution": "# Implementation", "hint": "Start with the basics", "explanation": "Start simple and build up."},
             {"type": "multiple_choice", "question": f"Common mistake with {topic}?", "options": ["Forgetting syntax", "Using too much", "No mistakes possible", "Never happens"], "correct": 0, "explanation": "Pay attention to syntax details."},
-            {"type": "fill_blank", "question": f"Best practice: ___ your code", "answer": "test", "explanation": "Always test your code."},
+            {"type": "fill_blank", "question": "Best practice: ___ your code", "answer": "test", "explanation": "Always test your code."},
             {"type": "code", "question": f"Another {topic} example", "starter": "", "solution": "# Code here", "hint": "Practice makes perfect", "explanation": "Repetition builds skill."},
             {"type": "multiple_choice", "question": f"When to use {topic}?", "options": ["Appropriate situations", "Never", "Always", "Randomly"], "correct": 0, "explanation": "Use it when it fits the problem."},
             {"type": "fill_blank", "question": f"{topic} requires ___", "answer": "practice", "explanation": "Keep practicing!"},
@@ -1215,6 +1252,21 @@ def generate_lessons(language_id: str) -> List[dict]:
         ]
     
     lessons = []
+    lessons.append({
+        "id": f"{language_id}_tutorial_intro",
+        "title": "Tutorial: How Codero Works",
+        "description": "Learn how to answer, run code, use hints, and review mistakes before moving on.",
+        "xp": 10,
+        "unit": 0,
+        "unit_name": "Tutorial",
+        "is_tutorial": True,
+        "exercises": [
+            {"type": "multiple_choice", "question": "What should you do before showing the full answer?", "options": ["Try the hint", "Skip everything", "Logout", "Ignore feedback"], "correct": 0, "hint": "Hints help you learn without spoiling the answer."},
+            {"type": "fill_blank", "question": "Type RUN to confirm you know where the run/check button is: ___", "answer": "RUN", "hint": "The button checks your answer."},
+            {"type": "write_code", "question": "Write a hello output line.", "starter": "", "solution": "print('Hello Codero')", "hint": "Use print with the exact words Hello Codero."},
+        ],
+        "practice_content": {"summary": "Practice the tutorial skills any time.", "examples": ["Use hints first", "Review wrong answers", "Complete the lesson to unlock more content"]},
+    })
     for unit_num, (unit_name, topics) in enumerate(units, 1):
         for topic_idx, topic in enumerate(topics):
             lesson_id = f"{language_id}_{unit_num}_{topic_idx + 1}"
@@ -1260,7 +1312,7 @@ def add_challenge_variety(lesson: dict) -> dict:
             if code_seen == 1:
                 ex["type"] = "fix_broken_code"
                 ex["title"] = "Fix the broken code"
-                ex["starter"] = ex.get("starter") or (ex.get("solution", "").replace("print(", "prnt(", 1) if "print(" in ex.get("solution", "") else "// fix this code\n" + ex.get("solution", ""))
+                ex["starter"] = ""
             elif code_seen == 2:
                 ex["type"] = "write_code"
                 ex["title"] = "Write code from scratch"
@@ -1338,14 +1390,17 @@ def generate_daily_challenge() -> dict:
 
 @api_router.post("/auth/register")
 async def register(user: UserCreate, background_tasks: BackgroundTasks):
-    existing = await db.users.find_one({"$or": [{"email": user.email}, {"username": user.username}]})
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+    existing_email = await db.users.find_one({"email": user.email.lower()})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already has an account")
+    existing_username = await db.users.find_one({"username": username_regex(user.username)})
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username is already taken")
     
     user_dict = {
         "id": str(uuid.uuid4()),
-        "username": user.username,
-        "email": user.email,
+        "username": normalize_username(user.username),
+        "email": user.email.lower(),
         "password": hash_password(user.password),
         "xp": 0,
         "level": 1,
@@ -1356,6 +1411,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
         "last_activity": None,
         "badges": [],
         "friends": [],
+        "favorite_friends": [],
         "languages_studied": [],
         "daily_goal": 50,
         "daily_xp": 0,
@@ -1387,6 +1443,19 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
     await db.users.insert_one(user_dict)
     
     await queue_user_email(background_tasks, user_dict, "join")
+    verification_code = f"{random.randint(100000, 999999)}"
+    await db.verification_codes.update_one(
+        {"email": user_dict["email"], "used": False},
+        {"$set": {
+            "email": user_dict["email"],
+            "code_hash": hash_password(verification_code),
+            "expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+            "used": False,
+            "created_at": datetime.utcnow().isoformat(),
+        }},
+        upsert=True,
+    )
+    background_tasks.add_task(send_verification_email, user_dict["email"], verification_code)
 
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user_dict["id"]})
@@ -1395,7 +1464,12 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin, background_tasks: BackgroundTasks):
-    user = await db.users.find_one({"email": credentials.email})
+    user = await db.users.find_one({
+        "$or": [
+            {"email": credentials.email.lower()},
+            {"username": username_regex(credentials.email)},
+        ]
+    })
     if not user or user["password"] != hash_password(credentials.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -1718,10 +1792,17 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="Language not found")
     
     lesson = None
-    for l in LESSONS_CACHE[answer.language]:
-        if l["id"] == answer.lesson_id:
-            lesson = l
+    for lesson_item in LESSONS_CACHE[answer.language]:
+        if lesson_item["id"] == answer.lesson_id:
+            lesson = lesson_item
             break
+
+    if not lesson.get("is_tutorial"):
+        tutorial_id = f"{answer.language}_tutorial_intro"
+        tutorial_done = await db.progress.find_one({"user_id": user["id"], "language": answer.language, "lesson_id": tutorial_id, "completed": True})
+        if not tutorial_done:
+            raise HTTPException(status_code=403, detail="Complete the Tutorial unit before starting other lessons")
+
     
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
@@ -1742,12 +1823,17 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
         # Calculate score for feedback only
         exercises = lesson.get("exercises", [])
         correct = 0
+        wrong_review = []
         for i, ex in enumerate(exercises):
             if i < len(answer.answers):
                 user_answer = answer.answers[i]
                 is_correct, message, expected = check_exercise_answer(ex, user_answer, answer.language)
                 if is_correct:
                     correct += 1
+                else:
+                    simple = explain_error_simple(message)
+                    wrong_review.append({"question": ex.get("question", ex.get("title", "Challenge")), "your_answer": user_answer, "expected_answer": expected, "explanation": simple})
+                    await save_wrong_answer(user["id"], answer.language, answer.lesson_id, i, ex, user_answer, expected, simple)
         
         return {
             "practice_mode": True,
@@ -1758,11 +1844,13 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             "hearts_lost": 0,
             "message": "Practice complete! No hearts lost, keep learning!",
             "practice_sessions": practice_sessions,
+            "wrong_review": wrong_review,
         }
     
     # NORMAL MODE
     exercises = lesson.get("exercises", [])
     correct = 0
+    wrong_review = []
     for i, ex in enumerate(exercises):
         if i < len(answer.answers):
             user_answer = answer.answers[i]
@@ -1770,7 +1858,9 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             if is_correct:
                 correct += 1
             else:
-                await save_wrong_answer(user["id"], answer.language, answer.lesson_id, i, ex, user_answer, expected, explain_error_simple(message))
+                simple = explain_error_simple(message)
+                wrong_review.append({"question": ex.get("question", ex.get("title", "Challenge")), "your_answer": user_answer, "expected_answer": expected, "explanation": simple})
+                await save_wrong_answer(user["id"], answer.language, answer.lesson_id, i, ex, user_answer, expected, simple)
     
     total = len(exercises)
     score = int((correct / total) * 100) if total > 0 else 100
@@ -1942,6 +2032,7 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             "daily_xp": daily_xp,
             "daily_goal": daily_goal,
             "daily_goal_met": daily_goal_met,
+            "wrong_review": wrong_review,
         }
     else:
         if score > existing.get("score", 0):
@@ -1966,6 +2057,7 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             "already_completed": True,
             "daily_xp": user.get("daily_xp", 0),
             "daily_goal": user.get("daily_goal", 50),
+            "wrong_review": wrong_review,
         }
 
 @api_router.get("/progress/{language_id}")
@@ -2018,7 +2110,7 @@ async def use_hint(user: dict = Depends(get_current_user)):
 async def check_code_challenge(check: CodeCheckRequest, user: dict = Depends(get_current_user)):
     exercise = check.exercise or {}
     if check.lesson_id and check.exercise_index is not None:
-        lesson = next((l for l in LESSONS_CACHE.get(check.language, []) if l["id"] == check.lesson_id), None)
+        lesson = next((lesson_item for lesson_item in LESSONS_CACHE.get(check.language, []) if lesson_item["id"] == check.lesson_id), None)
         if lesson and 0 <= check.exercise_index < len(lesson.get("exercises", [])):
             exercise = lesson["exercises"][check.exercise_index]
     if not exercise:
@@ -2125,7 +2217,7 @@ async def suggest_friends(q: str = Query("", min_length=0), user: dict = Depends
         return []
     excluded_ids = set(user.get("friends", [])) | {user["id"]}
     pattern = re.compile(re.escape(query), re.IGNORECASE)
-    users = await db.users.find({"username": pattern, "id": {"$nin": list(excluded_ids)}}, {"username": 1, "xp": 1, "level": 1, "profile": 1}).limit(8).to_list(8)
+    users = await db.users.find({"$or": [{"username": pattern}, {"profile.display_name": pattern}], "id": {"$nin": list(excluded_ids)}}, {"username": 1, "xp": 1, "level": 1, "profile": 1, "email": 1}).limit(8).to_list(8)
     return [
         {
             "username": u["username"],
@@ -2138,7 +2230,7 @@ async def suggest_friends(q: str = Query("", min_length=0), user: dict = Depends
 
 @api_router.post("/friends/add")
 async def add_friend(request: FriendRequest, user: dict = Depends(get_current_user)):
-    friend = await db.users.find_one({"username": request.friend_username})
+    friend = await db.users.find_one({"username": username_regex(request.friend_username)})
     if not friend:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -2164,7 +2256,21 @@ async def get_friends(user: dict = Depends(get_current_user)):
         return []
     
     friends = await db.users.find({"id": {"$in": friend_ids}}).to_list(100)
-    return [{"username": f["username"], "xp": f.get("xp", 0), "level": f.get("level", 1), "streak": f.get("streak", 0)} for f in friends]
+    return [{"id": f["id"], "username": f["username"], "display_name": (f.get("profile") or {}).get("display_name", f["username"]), "xp": f.get("xp", 0), "level": f.get("level", 1), "streak": f.get("streak", 0), "favorite": f["id"] in user.get("favorite_friends", []), "is_admin": is_admin_user(f), "admin_tag": "ADMIN" if is_admin_user(f) else None} for f in friends]
+
+@api_router.post("/friends/{friend_id}/favorite")
+async def toggle_favorite_friend(friend_id: str, user: dict = Depends(get_current_user)):
+    if friend_id not in user.get("friends", []):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    favorites = set(user.get("favorite_friends", []))
+    if friend_id in favorites:
+        favorites.remove(friend_id)
+        favorite = False
+    else:
+        favorites.add(friend_id)
+        favorite = True
+    await db.users.update_one({"id": user["id"]}, {"$set": {"favorite_friends": list(favorites)}})
+    return {"friend_id": friend_id, "favorite": favorite}
 
 @api_router.get("/badges")
 async def get_badges():
