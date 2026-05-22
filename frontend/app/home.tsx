@@ -138,6 +138,17 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
             <LinearGradient colors={['#00BFFF', '#0080FF']} style={styles.actionGradient}>
+              <Ionicons name="podium" size={24} color="#0D0D0D" />
+            </LinearGradient>
+            <Text style={styles.actionText}>RANKS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/vip')}>
+            <LinearGradient colors={['#FFD700', '#FF8C00']} style={styles.actionGradient}>
+              <Ionicons name="star" size={24} color="#0D0D0D" />
+            </LinearGradient>
+            <Text style={styles.actionText}>VIP</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Continue Learning */}
         {continueLearning?.has_continue && (
@@ -159,18 +170,6 @@ export default function HomeScreen() {
             </LinearGradient>
           </TouchableOpacity>
         )}
-
-              <Ionicons name="podium" size={24} color="#0D0D0D" />
-            </LinearGradient>
-            <Text style={styles.actionText}>RANKS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/vip')}>
-            <LinearGradient colors={['#FFD700', '#FF8C00']} style={styles.actionGradient}>
-              <Ionicons name="star" size={24} color="#0D0D0D" />
-            </LinearGradient>
-            <Text style={styles.actionText}>VIP</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Languages */}
         <View style={styles.languagesHeader}>
