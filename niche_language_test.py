@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, List
 
 # Backend URL from environment
-BACKEND_URL = "https://pixel-coder-3.preview.emergentagent.com/api"
+BACKEND_URL = "https://codero-stack.preview.emergentagent.com/api"
 
 class NicheLanguageTester:
     def __init__(self):

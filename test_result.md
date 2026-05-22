@@ -116,6 +116,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Enhanced auth system working perfectly. Users start with 10 gems, have comprehensive default settings (theme, font_size, sound_effects, etc.). Login/register includes gems and settings data. Settings API (GET/PUT /settings) fully functional."
+      - working: true
+        agent: "testing"
+        comment: "HEALTH CHECK PASSED (14/14 tests, 100% success). Fresh user registration verified with correct defaults (gems=10, hearts=5, settings present). Login working without ObjectId serialization errors. Protected endpoint /auth/me accessible with token. Settings persistence verified: PUT → GET → Re-login all working. Unauthorized access correctly rejected (403). Test user: finaltest_20260522_001222@codero.com"
 
   - task: "20 Programming Languages"
     implemented: true
@@ -152,6 +155,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Enhanced progress tracking working perfectly. Combo multipliers (1.0-5.0x) implemented, gems earned on lesson completion, daily XP tracking, speed bonuses for fast completion. All gamification features functional."
+      - working: true
+        agent: "testing"
+        comment: "HEALTH CHECK PASSED. Progress/data saving verified: Lesson completion awards XP (10 XP earned), gems (+5 gems), and badges (first_lesson). Progress persists in MongoDB (1 lesson completed). User stats updated correctly (total_lessons_completed=1, XP=10, gems=15). Re-completion correctly returns xp_earned=0 with already_completed flag. All persistence mechanisms working."
 
   - task: "Daily Challenge System"
     implemented: true
@@ -320,3 +326,7 @@ agent_communication:
     message: "Codero Games backend API testing completed successfully. All 8/8 tests passed (100% success rate). Comprehensive testing of all game endpoints: Bug Hunter (GET/POST), Code Puzzle (GET/POST), Speed Code (GET/POST), Game Complete, and Game Stats. All endpoints working perfectly with proper security (no answer exposure), authentication, XP/gems calculations, and game statistics tracking. Tested with multiple languages (Python, JavaScript). All game types properly implemented with comprehensive challenge data. Backend games API is production-ready."
   - agent: "testing"
     message: "Niche Language Gaming Support testing completed successfully. All 5/5 tests passed (100% success rate). Comprehensive verification of niche language support: 1) Bug Hunter endpoints for all 5 niche languages (shell, haskell, elixir, zig, lua) return language-specific challenges with correct ID prefixes (sh_, hs_, ex_, zig_, lua_). 2) Speed Code endpoints working correctly for all niche languages with language-specific prompts and concepts. 3) Lessons endpoints verified for all 6 niche languages (including skript) with 30 lessons each containing language-specific content and topics. 4) Answer validation tested and working for Haskell Bug Hunter and Shell Speed Code. All challenges have proper security (no answer exposure) and correct structure. CRITICAL FINDING: Niche languages are NOT falling back to Python - each has unique, language-specific content as required. All niche language gaming features are production-ready."
+  - agent: "main"
+    message: "User requested preview/system startup from GitHub and specifically asked to ensure accounts, login, and data saving work if bugged. GitHub repo was fetched to /tmp/codero-github-1779408410 and key files match current /app workspace. Dependencies installed, backend/expo restarted, MongoDB running. Please test auth/register/login/session-protected routes and persistence: register fresh user, login, get /auth/me or profile endpoint, update settings, complete a lesson/progress, re-login/re-fetch and verify MongoDB persistence. Use /app/memory/test_credentials.md if helpful."
+  - agent: "testing"
+    message: "BACKEND HEALTH CHECK COMPLETE - ALL SYSTEMS OPERATIONAL. Comprehensive testing of auth/login/data persistence completed with 14/14 tests passed (100% success rate). Test results: 1) API health: Root endpoint and /api/languages working. 2) User registration: Fresh timestamped user created with correct defaults (gems=10, hearts=5, settings present). 3) Login: No ObjectId serialization errors, token and user returned correctly. 4) Protected endpoints: /api/auth/me accessible with valid token, unauthorized access correctly rejected (403). 5) Settings persistence: PUT → GET → Re-login all working, settings persisted in MongoDB. 6) Progress/data saving: Lesson completion awards XP (10), gems (+5), badges (first_lesson). Progress persists in MongoDB. User stats updated correctly. Re-completion correctly returns xp_earned=0 with already_completed flag. Test user created: finaltest_20260522_001222@codero.com / secure123test. All critical backend functionality verified and working correctly."
