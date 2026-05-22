@@ -2344,9 +2344,41 @@ SPEED_CODE_CHALLENGES = {
     ],
 }
 
+def get_language_name(language: str) -> str:
+    return next((item["name"] for item in LANGUAGES if item["id"] == language), language.replace("_", " ").title())
+
+def generic_bug_hunter_challenges(language: str) -> List[dict]:
+    name = get_language_name(language)
+    return [
+        {"id": f"{language}_bug_1", "code": f"// {name}\nprintt('Hello from {name}')", "bug_line": 2, "question": f"Find the typo in this {name} output code:", "options": ["Output command is misspelled", "Missing database", "Wrong file name", "Needs a loop"], "correct": 0, "fixed_code": f"print('Hello from {name}')", "explanation": f"This {name} challenge checks the most common beginner bug: a misspelled output command.", "concept": "Output syntax"},
+        {"id": f"{language}_bug_2", "code": "value = 10\nif value = 10:\n  print('match')", "bug_line": 2, "question": f"Why does this {name} condition break?", "options": ["Use comparison, not assignment", "value is too large", "print cannot be used", "Missing import"], "correct": 0, "fixed_code": "value = 10\nif value == 10:\n  print('match')", "explanation": "Conditions compare values. Assignment changes a value and is not the same thing.", "concept": "Comparisons"},
+        {"id": f"{language}_bug_3", "code": "items = [1, 2, 3]\nshow(items[3])", "bug_line": 2, "question": f"This {name} list access fails. Why?", "options": ["Index is out of range", "Lists cannot store numbers", "Need VIP", "Wrong variable name"], "correct": 0, "fixed_code": "items = [1, 2, 3]\nshow(items[2])", "explanation": "Most languages index from 0, so a 3-item list ends at index 2.", "concept": "Indexing"},
+        {"id": f"{language}_bug_4", "code": "function add(a, b)\n  result = a + b\nend", "bug_line": 3, "question": f"Why does this {name} function not give back the sum?", "options": ["Missing return statement", "a and b are strings", "Function name is too short", "Needs a class"], "correct": 0, "fixed_code": "function add(a, b)\n  return a + b\nend", "explanation": "Functions usually need an explicit return to send a value back.", "concept": "Return values"},
+        {"id": f"{language}_bug_5", "code": "name = 'Alex\nshow(name)", "bug_line": 1, "question": f"This {name} string is broken. What is missing?", "options": ["Closing quote", "A database", "An array", "A timer"], "correct": 0, "fixed_code": "name = 'Alex'\nshow(name)", "explanation": "Strings need matching opening and closing quotes.", "concept": "Strings"},
+    ]
+
+def generic_code_puzzles(language: str) -> List[dict]:
+    name = get_language_name(language)
+    return [
+        {"id": f"{language}_puz_1", "title": f"{name} Hello Flow", "description": f"Arrange a simple {name} greeting flow", "lines": ["create greeting message", "send message to output", "finish program"], "correct_order": [0, 1, 2], "explanation": "Set up the message first, output it second, then finish.", "concept": "Program flow"},
+        {"id": f"{language}_puz_2", "title": f"{name} Function Flow", "description": "Build a function from setup to use", "lines": ["call the function", "define the function", "return the result"], "correct_order": [1, 2, 0], "explanation": "Define the function, return a value, then call it.", "concept": "Functions"},
+        {"id": f"{language}_puz_3", "title": f"{name} Loop Flow", "description": "Arrange a safe loop", "lines": ["create collection", "loop through collection", "handle each item", "show final result"], "correct_order": [0, 1, 2, 3], "explanation": "Prepare data before looping, process items, then show the result.", "concept": "Loops"},
+    ]
+
+def generic_speed_challenges(language: str) -> List[dict]:
+    name = get_language_name(language)
+    return [
+        {"id": f"{language}_speed_1", "prompt": f"Write a {name} hello output", "expected": "print('Hello World')", "time_limit": 15, "points": 10, "concept": "output"},
+        {"id": f"{language}_speed_2", "prompt": "Create variable score = 10", "expected": "score = 10", "time_limit": 12, "points": 10, "concept": "variables"},
+        {"id": f"{language}_speed_3", "prompt": "Compare score equals 10", "expected": "score == 10", "time_limit": 12, "points": 15, "concept": "comparison"},
+        {"id": f"{language}_speed_4", "prompt": "Return score from a function", "expected": "return score", "time_limit": 12, "points": 15, "concept": "return"},
+        {"id": f"{language}_speed_5", "prompt": "Create an empty items list", "expected": "items = []", "time_limit": 12, "points": 10, "concept": "collections"},
+    ]
+
+
 @api_router.get("/games/bug-hunter/{language}")
 async def get_bug_hunter(language: str):
-    challenges = BUG_HUNTER_CHALLENGES.get(language, BUG_HUNTER_CHALLENGES.get("python", []))
+    challenges = BUG_HUNTER_CHALLENGES.get(language) or generic_bug_hunter_challenges(language)
     selected = random.sample(challenges, min(5, len(challenges)))
     # Remove correct answer info for client
     safe = []
@@ -2361,7 +2393,7 @@ async def get_bug_hunter(language: str):
 async def check_bug_hunter(language: str, data: dict):
     challenge_id = data.get("challenge_id")
     selected = data.get("selected", -1)
-    challenges = BUG_HUNTER_CHALLENGES.get(language, BUG_HUNTER_CHALLENGES.get("python", []))
+    challenges = BUG_HUNTER_CHALLENGES.get(language) or generic_bug_hunter_challenges(language)
     for c in challenges:
         if c["id"] == challenge_id:
             correct = selected == c["correct"]
@@ -2375,7 +2407,7 @@ async def check_bug_hunter(language: str, data: dict):
 
 @api_router.get("/games/code-puzzle/{language}")
 async def get_code_puzzle(language: str):
-    puzzles = CODE_PUZZLE_CHALLENGES.get(language, CODE_PUZZLE_CHALLENGES.get("python", []))
+    puzzles = CODE_PUZZLE_CHALLENGES.get(language) or generic_code_puzzles(language)
     selected = random.sample(puzzles, min(3, len(puzzles)))
     safe = []
     for p in selected:
@@ -2393,7 +2425,7 @@ async def get_code_puzzle(language: str):
 async def check_code_puzzle(language: str, data: dict):
     puzzle_id = data.get("puzzle_id")
     user_order = data.get("order", [])
-    puzzles = CODE_PUZZLE_CHALLENGES.get(language, CODE_PUZZLE_CHALLENGES.get("python", []))
+    puzzles = CODE_PUZZLE_CHALLENGES.get(language) or generic_code_puzzles(language)
     for p in puzzles:
         if p["id"] == puzzle_id:
             correct = user_order == p["correct_order"]
@@ -2407,7 +2439,7 @@ async def check_code_puzzle(language: str, data: dict):
 
 @api_router.get("/games/speed-code/{language}")
 async def get_speed_code(language: str):
-    challenges = SPEED_CODE_CHALLENGES.get(language, SPEED_CODE_CHALLENGES.get("python", []))
+    challenges = SPEED_CODE_CHALLENGES.get(language) or generic_speed_challenges(language)
     selected = random.sample(challenges, min(5, len(challenges)))
     safe = [{"id": c["id"], "prompt": c["prompt"], "time_limit": c["time_limit"], "points": c["points"], "concept": c["concept"]} for c in selected]
     return {"language": language, "challenges": safe, "total": len(safe)}
@@ -2416,7 +2448,7 @@ async def get_speed_code(language: str):
 async def check_speed_code(language: str, data: dict):
     challenge_id = data.get("challenge_id")
     user_code = data.get("code", "").strip()
-    challenges = SPEED_CODE_CHALLENGES.get(language, SPEED_CODE_CHALLENGES.get("python", []))
+    challenges = SPEED_CODE_CHALLENGES.get(language) or generic_speed_challenges(language)
     for c in challenges:
         if c["id"] == challenge_id:
             expected_norm = c["expected"].strip().lower().replace(" ", "")
