@@ -147,25 +147,26 @@ export default function FriendsScreen() {
               {adding ? (
                 <ActivityIndicator size="small" color="#0D0D0D" />
               ) : (
-            {suggestions.length > 0 && (
-              <View style={styles.suggestionsBox}>
-                <Text style={styles.suggestionsLabel}>TAB COMPLETIONS</Text>
-                {suggestions.map((suggestion) => (
-                  <TouchableOpacity
-                    key={suggestion.username}
-                    style={styles.suggestionPill}
-                    onPress={() => setAddUsername(suggestion.username)}
-                  >
-                    <Text style={styles.suggestionName}>{suggestion.username}</Text>
-                    <Text style={styles.suggestionMeta}>LV {suggestion.level}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
                 <Ionicons name="add" size={24} color="#0D0D0D" />
               )}
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Username Suggestions */}
+        {showAdd && suggestions.length > 0 && (
+          <View style={styles.suggestionsBox}>
+            <Text style={styles.suggestionsLabel}>TAB COMPLETIONS</Text>
+            {suggestions.map((suggestion) => (
+              <TouchableOpacity
+                key={suggestion.username}
+                style={styles.suggestionPill}
+                onPress={() => setAddUsername(suggestion.username)}
+              >
+                <Text style={styles.suggestionName}>{suggestion.username}</Text>
+                <Text style={styles.suggestionMeta}>LV {suggestion.level}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 

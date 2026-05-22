@@ -345,6 +345,18 @@ export default function LessonScreen() {
                     ]}>
                       {selectedOption === index && (
                         <Ionicons name="checkmark" size={14} color="#0D0D0D" />
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.optionText,
+                      selectedOption === index && styles.optionTextSelected,
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Drag Drop Blocks */}
             {exercise.type === 'drag_drop' && (
@@ -364,19 +376,6 @@ export default function LessonScreen() {
                   >
                     <Text style={styles.dragIndex}>{index + 1}</Text>
                     <Text style={styles.dragText}>{block}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-                      )}
-                    </View>
-                    <Text style={[
-                      styles.optionText,
-                      selectedOption === index && styles.optionTextSelected,
-                    ]}>
-                      {option}
-                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
