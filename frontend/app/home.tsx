@@ -27,10 +27,22 @@ export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const [languages, setLanguages] = useState<Language[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [continueLearning, setContinueLearning] = useState<any>(null);
+
 
   useEffect(() => {
     fetchLanguages();
+    fetchContinueLearning();
   }, []);
+
+  const fetchContinueLearning = async () => {
+    try {
+      const response = await api.get('/continue-learning');
+      setContinueLearning(response.data);
+    } catch (error) {
+      console.error('Failed to fetch continue learning:', error);
+    }
+  };
 
   const fetchLanguages = async () => {
     try {
@@ -43,7 +55,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchLanguages(), refreshUser()]);
+    await Promise.all([fetchLanguages(), fetchContinueLearning(), refreshUser()]);
     setRefreshing(false);
   };
 
@@ -126,6 +138,28 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
             <LinearGradient colors={['#00BFFF', '#0080FF']} style={styles.actionGradient}>
+
+        {/* Continue Learning */}
+        {continueLearning?.has_continue && (
+          <TouchableOpacity
+            style={styles.continueLearningCard}
+            onPress={() => router.push(`/lesson/${continueLearning.language_id}/${continueLearning.lesson_id}`)}
+            activeOpacity={0.85}
+          >
+            <LinearGradient colors={['rgba(0,255,136,0.22)', 'rgba(0,191,255,0.14)']} style={styles.continueLearningGradient}>
+              <View style={styles.continueLearningIcon}>
+                <Ionicons name="play" size={22} color="#0D0D0D" />
+              </View>
+              <View style={styles.continueLearningTextWrap}>
+                <Text style={styles.continueLearningLabel}>CONTINUE LEARNING</Text>
+                <Text style={styles.continueLearningTitle}>{String(continueLearning.title || '').toUpperCase()}</Text>
+                <Text style={styles.continueLearningMeta}>{continueLearning.completed_lessons}/{continueLearning.total_lessons} LESSONS DONE</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#00FF88" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
               <Ionicons name="podium" size={24} color="#0D0D0D" />
             </LinearGradient>
             <Text style={styles.actionText}>RANKS</Text>
@@ -250,6 +284,49 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P_400Regular',
     fontSize: 8,
     color: '#00FF88',
+  continueLearningCard: {
+    marginHorizontal: 20,
+    marginBottom: 18,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.35)',
+  },
+  continueLearningGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+  },
+  continueLearningIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#00FF88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueLearningTextWrap: {
+    flex: 1,
+    gap: 6,
+  },
+  continueLearningLabel: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 7,
+    color: '#00FF88',
+  },
+  continueLearningTitle: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 10,
+    color: '#FFF',
+    lineHeight: 18,
+  },
+  continueLearningMeta: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 7,
+    color: '#888',
+  },
+
   },
   xpText: {
     fontFamily: 'PressStart2P_400Regular',

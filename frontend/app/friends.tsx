@@ -31,10 +31,30 @@ export default function FriendsScreen() {
   const [addUsername, setAddUsername] = useState('');
   const [adding, setAdding] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+
 
   useEffect(() => {
     fetchFriends();
   }, []);
+
+  useEffect(() => {
+    const query = addUsername.trim();
+    if (!showAdd || query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await api.get(`/friends/suggest?q=${encodeURIComponent(query)}`);
+        setSuggestions(response.data);
+      } catch (error) {
+        setSuggestions([]);
+      }
+    }, 180);
+    return () => clearTimeout(timeout);
+  }, [addUsername, showAdd]);
+
 
   const fetchFriends = async () => {
     try {
@@ -64,6 +84,7 @@ export default function FriendsScreen() {
       await api.post('/friends/add', { friend_username: addUsername.trim() });
       Alert.alert('SUCCESS', `Added ${addUsername} as friend!`);
       setAddUsername('');
+      setSuggestions([]);
       setShowAdd(false);
       fetchFriends();
     } catch (error: any) {
@@ -126,6 +147,22 @@ export default function FriendsScreen() {
               {adding ? (
                 <ActivityIndicator size="small" color="#0D0D0D" />
               ) : (
+            {suggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                <Text style={styles.suggestionsLabel}>TAB COMPLETIONS</Text>
+                {suggestions.map((suggestion) => (
+                  <TouchableOpacity
+                    key={suggestion.username}
+                    style={styles.suggestionPill}
+                    onPress={() => setAddUsername(suggestion.username)}
+                  >
+                    <Text style={styles.suggestionName}>{suggestion.username}</Text>
+                    <Text style={styles.suggestionMeta}>LV {suggestion.level}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
                 <Ionicons name="add" size={24} color="#0D0D0D" />
               )}
             </TouchableOpacity>
@@ -241,6 +278,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 16,
+  suggestionsBox: {
+    marginHorizontal: 20,
+    marginTop: -6,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,136,0.25)',
+    gap: 8,
+  },
+  suggestionsLabel: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 7,
+    color: '#00FF88',
+  },
+  suggestionPill: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  suggestionName: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#FFF',
+  },
+  suggestionMeta: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 7,
+    color: '#888',
+  },
+
     gap: 12,
   },
   addInputContainer: {

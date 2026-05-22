@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, BackgroundTasks, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -8,13 +8,17 @@ import os
 import logging
 import re
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
 import hashlib
 import secrets
 import random
+import smtplib
+import ssl
+from email.message import EmailMessage
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -59,6 +63,29 @@ class DailyChallengeAnswer(BaseModel):
 class VIPPurchase(BaseModel):
     payment_method: str = "card"  # card, paypal, etc.
 
+class ProfileUpdate(BaseModel):
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_color: Optional[str] = None
+
+class DisplayBadgesUpdate(BaseModel):
+    badge_ids: List[str]
+
+class CodeCheckRequest(BaseModel):
+    language: str
+    lesson_id: Optional[str] = None
+    exercise_index: Optional[int] = None
+    exercise: Optional[Dict[str, Any]] = None
+    answer: Dict[str, Any]
+    save_wrong: bool = True
+
+class VerificationCodeRequest(BaseModel):
+    email: EmailStr
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
 # ============== HELPER FUNCTIONS ==============
 
 def hash_password(password: str) -> str:
@@ -80,6 +107,103 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 def is_vip_active(user: dict) -> bool:
     """Check if user has active VIP - earned through 7+ day streak"""
     return user.get("streak", 0) >= 7
+
+def public_user(user: dict) -> dict:
+    """Return a clean user payload with forward-compatible profile/auth defaults."""
+    clean = dict(user)
+    clean.pop("password", None)
+    clean.pop("_id", None)
+    clean.setdefault("profile", {
+        "display_name": clean.get("username", "Coder"),
+        "bio": "",
+        "avatar_color": "#00FF88",
+        "display_badges": clean.get("badges", [])[:3],
+    })
+    clean.setdefault("auth_methods", {
+        "password": True,
+        "email_verified": clean.get("email_verified", False),
+        "passkey_ready": True,
+        "google_ready": True,
+    })
+    clean.setdefault("email_verified", clean.get("auth_methods", {}).get("email_verified", False))
+    clean["is_vip"] = is_vip_active(clean)
+    clean["vip_perks"] = get_vip_perks(clean)
+    return clean
+
+def explain_error_simple(message: str) -> str:
+    lower = (message or "").lower()
+    if "print" in lower or "output" in lower:
+        return "The answer needs the right output command. Check the function name and punctuation."
+    if "required" in lower or "element" in lower:
+        return "Your code is missing one of the main pieces the challenge asks for."
+    if "blank" in lower:
+        return "The blank does not match yet. Check spelling and symbols."
+    if "order" in lower:
+        return "The blocks are not in the right order yet. Put setup first, logic next, output last."
+    return "Something is close, but not exact yet. Compare the goal, syntax, and missing keywords."
+
+def check_exercise_answer(exercise: dict, user_answer: dict, language: str) -> tuple:
+    """Simulated, safe code checking. No arbitrary code is executed."""
+    exercise_type = exercise.get("type", "code")
+    if exercise_type == "multiple_choice":
+        correct = user_answer.get("selected") == exercise.get("correct")
+        expected = exercise.get("options", [None])[exercise.get("correct", 0)] if exercise.get("options") else exercise.get("correct")
+        return correct, "Great choice!" if correct else "That option does not match the concept.", expected
+    if exercise_type == "fill_blank":
+        expected = str(exercise.get("answer", "")).strip()
+        actual = str(user_answer.get("answer", "")).strip()
+        correct = actual.lower() == expected.lower()
+        return correct, "Blank filled correctly!" if correct else "The blank is not exact yet.", expected
+    if exercise_type in ["code", "write_code", "fix_broken_code"]:
+        expected = exercise.get("solution", "")
+        actual = user_answer.get("code", "")
+        correct, message = validate_code(actual, expected, language, "code")
+        return correct, message, expected
+    if exercise_type == "predict_output":
+        expected = str(exercise.get("answer", "")).strip()
+        actual = str(user_answer.get("answer", user_answer.get("selected", ""))).strip()
+        if exercise.get("options") and isinstance(user_answer.get("selected"), int):
+            actual = str(exercise["options"][user_answer["selected"]]).strip()
+        correct = actual.lower() == expected.lower()
+        return correct, "You predicted the output!" if correct else "Run through the code line by line and track the value.", expected
+    if exercise_type == "drag_drop":
+        expected = exercise.get("correct_order", [])
+        actual = user_answer.get("order", [])
+        correct = actual == expected
+        return correct, "The code blocks are in order!" if correct else "The order is not quite right.", expected
+    return False, "Unsupported challenge type", None
+
+async def save_wrong_answer(user_id: str, language: str, lesson_id: Optional[str], exercise_index: Optional[int], exercise: dict, user_answer: dict, expected: Any, explanation: str):
+    await db.wrong_answers.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "language": language,
+        "lesson_id": lesson_id,
+        "exercise_index": exercise_index,
+        "exercise_type": exercise.get("type"),
+        "question": exercise.get("question", exercise.get("title", "Challenge")),
+        "user_answer": user_answer,
+        "expected_answer": expected,
+        "explanation": explanation,
+        "reviewed": False,
+        "created_at": datetime.utcnow().isoformat(),
+    })
+
+def send_verification_email(to_email: str, code: str):
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not smtp_user or not smtp_pass:
+        logger.warning("SMTP credentials are not configured; verification email not sent")
+        return
+    msg = EmailMessage()
+    msg["Subject"] = "Your Codero verification code"
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg.set_content(f"Your Codero verification code is {code}. It expires in 10 minutes.")
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
 
 def get_vip_perks(user: dict) -> dict:
     """Get VIP perks for user"""
@@ -998,7 +1122,65 @@ def generate_lessons(language_id: str) -> List[dict]:
     return lessons
 
 # Pre-generate lessons
-LESSONS_CACHE = {lang["id"]: generate_lessons(lang["id"]) for lang in LANGUAGES}
+
+def infer_code_output(solution: str) -> str:
+    match = re.search(r"print\s*\(\s*['\"]([^'\"]+)['\"]\s*\)", solution or "")
+    if match:
+        return match.group(1)
+    match = re.search(r"console\.log\s*\(\s*['\"]([^'\"]+)['\"]\s*\)", solution or "")
+    if match:
+        return match.group(1)
+    match = re.search(r"echo\s+['\"]?([^'\"\n]+)['\"]?", solution or "")
+    if match:
+        return match.group(1).strip()
+    return "Result"
+
+def add_challenge_variety(lesson: dict) -> dict:
+    enriched = dict(lesson)
+    exercises = [dict(ex) for ex in lesson.get("exercises", [])]
+    code_seen = 0
+    first_code_solution = ""
+    for ex in exercises:
+        if ex.get("type") == "code":
+            code_seen += 1
+            first_code_solution = first_code_solution or ex.get("solution", "")
+            if code_seen == 1:
+                ex["type"] = "fix_broken_code"
+                ex["title"] = "Fix the broken code"
+                ex["starter"] = ex.get("starter") or (ex.get("solution", "").replace("print(", "prnt(", 1) if "print(" in ex.get("solution", "") else "// fix this code\n" + ex.get("solution", ""))
+            elif code_seen == 2:
+                ex["type"] = "write_code"
+                ex["title"] = "Write code from scratch"
+            elif code_seen == 3:
+                solution = ex.get("solution", "")
+                blocks = [line for line in solution.split("\n") if line.strip()] or [part.strip() for part in solution.split(";") if part.strip()]
+                if len(blocks) >= 2:
+                    ex["type"] = "drag_drop"
+                    ex["title"] = "Drag-and-drop code blocks"
+                    ex["blocks"] = list(reversed(blocks))
+                    ex["correct_order"] = blocks
+                else:
+                    ex["type"] = "write_code"
+    if first_code_solution:
+        for ex in exercises:
+            if ex.get("type") == "multiple_choice":
+                expected_output = infer_code_output(first_code_solution)
+                ex.clear()
+                ex.update({
+                    "type": "predict_output",
+                    "question": "Predict the output of this code.",
+                    "code": first_code_solution,
+                    "answer": expected_output,
+                    "options": [expected_output, "Syntax error", "Nothing", "None"],
+                    "hint": "Read the code from top to bottom and track what gets printed.",
+                    "explanation": "Predict-output challenges train you to mentally run code before pressing Run.",
+                })
+                break
+    enriched["exercises"] = exercises
+    return enriched
+
+
+LESSONS_CACHE = {lang["id"]: [add_challenge_variety(lesson) for lesson in generate_lessons(lang["id"])] for lang in LANGUAGES}
 
 # ============== DAILY CHALLENGES ==============
 
@@ -1082,6 +1264,19 @@ async def register(user: UserCreate):
             "theme": "dark",
         },
         "daily_challenges_completed": [],
+        "profile": {
+            "display_name": user.username,
+            "bio": "",
+            "avatar_color": "#00FF88",
+            "display_badges": [],
+        },
+        "auth_methods": {
+            "password": True,
+            "email_verified": False,
+            "passkey_ready": True,
+            "google_ready": True,
+        },
+        "email_verified": False,
         "created_at": datetime.utcnow().isoformat(),
     }
     await db.users.insert_one(user_dict)
@@ -1089,9 +1284,7 @@ async def register(user: UserCreate):
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user_dict["id"]})
     
-    user_dict.pop("password", None)
-    user_dict.pop("_id", None)
-    return {"token": token, "user": user_dict}
+    return {"token": token, "user": public_user(user_dict)}
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
@@ -1128,21 +1321,12 @@ async def login(credentials: UserLogin):
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user["id"]})
     
-    # Build clean response user
     user.update(update_fields)
-    user.pop("password", None)
-    user.pop("_id", None)
-    user["is_vip"] = is_vip_active(user)
-    user["vip_perks"] = perks
-    return {"token": token, "user": user}
+    return {"token": token, "user": public_user(user)}
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    user.pop("password", None)
-    user.pop("_id", None)
-    user["is_vip"] = is_vip_active(user)
-    user["vip_perks"] = get_vip_perks(user)
-    return user
+    return public_user(user)
 
 @api_router.post("/auth/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -1150,6 +1334,100 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return {"message": "Logged out"}
 
 # ============== VIP ROUTES ==============
+
+@api_router.post("/auth/send-verification-code")
+async def send_email_verification(request: VerificationCodeRequest, background_tasks: BackgroundTasks):
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    await db.verification_codes.update_one(
+        {"email": request.email.lower(), "used": False},
+        {"$set": {
+            "email": request.email.lower(),
+            "code_hash": hash_password(code),
+            "expires_at": expires_at,
+            "used": False,
+            "created_at": datetime.utcnow().isoformat(),
+        }},
+        upsert=True,
+    )
+    background_tasks.add_task(send_verification_email, request.email.lower(), code)
+    return {"message": "Verification code queued", "email": request.email.lower(), "expires_at": expires_at}
+
+@api_router.post("/auth/verify-email")
+async def verify_email_code(request: VerifyEmailRequest):
+    record = await db.verification_codes.find_one({"email": request.email.lower(), "used": False})
+    if not record:
+        raise HTTPException(status_code=400, detail="No active verification code found")
+    if datetime.fromisoformat(record["expires_at"]) < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Verification code expired")
+    if record.get("code_hash") != hash_password(request.code):
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    await db.verification_codes.update_one({"_id": record["_id"]}, {"$set": {"used": True, "verified_at": datetime.utcnow().isoformat()}})
+    await db.users.update_many({"email": request.email.lower()}, {"$set": {"email_verified": True, "auth_methods.email_verified": True}})
+    return {"message": "Email verified", "email_verified": True}
+
+@api_router.get("/auth/security-options")
+async def get_security_options(user: dict = Depends(get_current_user)):
+    return {
+        "password_enabled": True,
+        "email_verification_enabled": True,
+        "email_verified": user.get("email_verified", False),
+        "passkeys_ready": True,
+        "google_sign_in_ready": True,
+        "note": "Schema and UI are ready for passkeys and Google auth; provider setup can be connected later.",
+    }
+
+@api_router.put("/profile")
+async def update_profile(profile_update: ProfileUpdate, user: dict = Depends(get_current_user)):
+    profile = user.get("profile") or {"display_name": user.get("username", "Coder"), "bio": "", "avatar_color": "#00FF88", "display_badges": user.get("badges", [])[:3]}
+    if profile_update.display_name is not None:
+        profile["display_name"] = profile_update.display_name[:32]
+    if profile_update.bio is not None:
+        profile["bio"] = profile_update.bio[:160]
+    if profile_update.avatar_color is not None:
+        profile["avatar_color"] = profile_update.avatar_color[:16]
+    await db.users.update_one({"id": user["id"]}, {"$set": {"profile": profile}})
+    return {"message": "Profile updated", "profile": profile}
+
+@api_router.put("/profile/display-badges")
+async def update_display_badges(update: DisplayBadgesUpdate, user: dict = Depends(get_current_user)):
+    if len(update.badge_ids) > 3:
+        raise HTTPException(status_code=400, detail="Choose up to 3 badges")
+    earned = set(user.get("badges", []))
+    if any(badge_id not in earned for badge_id in update.badge_ids):
+        raise HTTPException(status_code=400, detail="You can only display earned badges")
+    profile = user.get("profile") or {"display_name": user.get("username", "Coder"), "bio": "", "avatar_color": "#00FF88"}
+    profile["display_badges"] = update.badge_ids
+    await db.users.update_one({"id": user["id"]}, {"$set": {"profile": profile}})
+    return {"message": "Display badges updated", "display_badges": update.badge_ids}
+
+@api_router.get("/review/wrong-answers")
+async def get_wrong_answers(user: dict = Depends(get_current_user)):
+    items = await db.wrong_answers.find({"user_id": user["id"], "reviewed": False}).sort("created_at", -1).limit(50).to_list(50)
+    for item in items:
+        item.pop("_id", None)
+    return items
+
+@api_router.post("/review/wrong-answers/{wrong_answer_id}/reviewed")
+async def mark_wrong_answer_reviewed(wrong_answer_id: str, user: dict = Depends(get_current_user)):
+    result = await db.wrong_answers.update_one({"id": wrong_answer_id, "user_id": user["id"]}, {"$set": {"reviewed": True, "reviewed_at": datetime.utcnow().isoformat()}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Wrong answer not found")
+    return {"message": "Marked reviewed"}
+
+@api_router.get("/continue-learning")
+async def get_continue_learning(user: dict = Depends(get_current_user)):
+    studied = user.get("languages_studied", []) or ["python"]
+    for language_id in studied:
+        lessons = LESSONS_CACHE.get(language_id, [])
+        progress = await db.progress.find({"user_id": user["id"], "language": language_id, "completed": True}).to_list(1000)
+        completed_ids = {p["lesson_id"] for p in progress}
+        for lesson in lessons:
+            if lesson["id"] not in completed_ids:
+                return {"has_continue": True, "language_id": language_id, "lesson_id": lesson["id"], "title": lesson["title"], "description": lesson["description"], "completed_lessons": len(completed_ids), "total_lessons": len(lessons)}
+    first = LESSONS_CACHE["python"][0]
+    return {"has_continue": True, "language_id": "python", "lesson_id": first["id"], "title": first["title"], "description": first["description"], "completed_lessons": 0, "total_lessons": len(LESSONS_CACHE["python"])}
+
 
 @api_router.get("/vip/info")
 async def get_vip_info():
@@ -1322,15 +1600,9 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
         for i, ex in enumerate(exercises):
             if i < len(answer.answers):
                 user_answer = answer.answers[i]
-                if ex["type"] == "multiple_choice" and user_answer.get("selected") == ex.get("correct"):
+                is_correct, message, expected = check_exercise_answer(ex, user_answer, answer.language)
+                if is_correct:
                     correct += 1
-                elif ex["type"] == "code":
-                    is_correct, _ = validate_code(user_answer.get("code", ""), ex.get("solution", ""), answer.language)
-                    if is_correct:
-                        correct += 1
-                elif ex["type"] == "fill_blank":
-                    if user_answer.get("answer", "").strip().lower() == ex.get("answer", "").strip().lower():
-                        correct += 1
         
         return {
             "practice_mode": True,
@@ -1349,15 +1621,11 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
     for i, ex in enumerate(exercises):
         if i < len(answer.answers):
             user_answer = answer.answers[i]
-            if ex["type"] == "multiple_choice" and user_answer.get("selected") == ex.get("correct"):
+            is_correct, message, expected = check_exercise_answer(ex, user_answer, answer.language)
+            if is_correct:
                 correct += 1
-            elif ex["type"] == "code":
-                is_correct, _ = validate_code(user_answer.get("code", ""), ex.get("solution", ""), answer.language)
-                if is_correct:
-                    correct += 1
-            elif ex["type"] == "fill_blank":
-                if user_answer.get("answer", "").strip().lower() == ex.get("answer", "").strip().lower():
-                    correct += 1
+            else:
+                await save_wrong_answer(user["id"], answer.language, answer.lesson_id, i, ex, user_answer, expected, explain_error_simple(message))
     
     total = len(exercises)
     score = int((correct / total) * 100) if total > 0 else 100
@@ -1600,6 +1868,29 @@ async def use_hint(user: dict = Depends(get_current_user)):
 
 # ============== DAILY CHALLENGE ROUTES ==============
 
+
+@api_router.post("/code/check")
+async def check_code_challenge(check: CodeCheckRequest, user: dict = Depends(get_current_user)):
+    exercise = check.exercise or {}
+    if check.lesson_id and check.exercise_index is not None:
+        lesson = next((l for l in LESSONS_CACHE.get(check.language, []) if l["id"] == check.lesson_id), None)
+        if lesson and 0 <= check.exercise_index < len(lesson.get("exercises", [])):
+            exercise = lesson["exercises"][check.exercise_index]
+    if not exercise:
+        raise HTTPException(status_code=400, detail="Exercise not found")
+    correct, message, expected = check_exercise_answer(exercise, check.answer, check.language)
+    simple_explanation = message if correct else explain_error_simple(message)
+    if not correct and check.save_wrong:
+        await save_wrong_answer(user["id"], check.language, check.lesson_id, check.exercise_index, exercise, check.answer, expected, simple_explanation)
+    return {
+        "correct": correct,
+        "message": message,
+        "simple_explanation": simple_explanation,
+        "hint": exercise.get("hint"),
+        "show_answer_available": not correct,
+        "expected_answer": expected if not correct else None,
+    }
+
 @api_router.get("/daily-challenge")
 async def get_daily_challenge(user: dict = Depends(get_current_user)):
     challenge = generate_daily_challenge()
@@ -1665,16 +1956,37 @@ async def complete_daily_challenge(answer: DailyChallengeAnswer, user: dict = De
 # ============== SOCIAL ROUTES ==============
 
 @api_router.get("/leaderboard")
-async def get_leaderboard():
-    users = await db.users.find({}, {"username": 1, "xp": 1, "level": 1, "streak": 1, "badges": 1, "vip_until": 1}).sort("xp", -1).limit(50).to_list(50)
+async def get_leaderboard(user: dict = Depends(get_current_user)):
+    allowed_ids = set(user.get("friends", [])) | {user["id"]}
+    users = await db.users.find({"id": {"$in": list(allowed_ids)}}, {"username": 1, "xp": 1, "level": 1, "streak": 1, "badges": 1, "vip_until": 1, "profile": 1}).sort("xp", -1).limit(50).to_list(50)
     return [
         {
             "username": u["username"],
+            "display_name": (u.get("profile") or {}).get("display_name", u["username"]),
             "xp": u.get("xp", 0),
             "level": u.get("level", 1),
             "streak": u.get("streak", 0),
             "badges_count": len(u.get("badges", [])),
+            "display_badges": (u.get("profile") or {}).get("display_badges", u.get("badges", [])[:3]),
             "is_vip": is_vip_active(u),
+        }
+        for u in users
+    ]
+
+@api_router.get("/friends/suggest")
+async def suggest_friends(q: str = Query("", min_length=0), user: dict = Depends(get_current_user)):
+    query = (q or "").strip()
+    if len(query) < 2:
+        return []
+    excluded_ids = set(user.get("friends", [])) | {user["id"]}
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    users = await db.users.find({"username": pattern, "id": {"$nin": list(excluded_ids)}}, {"username": 1, "xp": 1, "level": 1, "profile": 1}).limit(8).to_list(8)
+    return [
+        {
+            "username": u["username"],
+            "display_name": (u.get("profile") or {}).get("display_name", u["username"]),
+            "level": u.get("level", 1),
+            "xp": u.get("xp", 0),
         }
         for u in users
     ]

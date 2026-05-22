@@ -1,21 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { api } from '../src/services/api';
+
 import { useAuth } from '../src/context/AuthContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const [displayName, setDisplayName] = useState(user?.profile?.display_name || user?.username || '');
+  const [bio, setBio] = useState(user?.profile?.bio || '');
+  const displayBadges = user?.profile?.display_badges?.slice(0, 3) || user?.badges?.slice(0, 3) || [];
+
+  const saveProfile = async () => {
+    try {
+      await api.put('/profile', { display_name: displayName, bio });
+      await api.put('/profile/display-badges', { badge_ids: (user?.badges || []).slice(0, 3) });
+      await refreshUser();
+      Alert.alert('SAVED', 'Profile customization saved.');
+    } catch (error: any) {
+      Alert.alert('ERROR', error.response?.data?.detail || 'Could not save profile');
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -49,6 +66,22 @@ export default function ProfileScreen() {
   return (
     <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+            {!!user?.profile?.bio && <Text style={styles.bioText}>{user.profile.bio}</Text>}
+            <View style={styles.displayBadgesRow}>
+              {[0, 1, 2].map((slot) => (
+                <View key={slot} style={styles.displayBadgeSlot}>
+                  {displayBadges[slot] ? (
+                    <>
+                      <Ionicons name="medal" size={18} color="#FFD700" />
+                      <Text style={styles.displayBadgeText}>{displayBadges[slot].replace(/_/g, ' ').toUpperCase()}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.emptyBadgeText}>BADGE SLOT</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -61,10 +94,10 @@ export default function ProfileScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarContainer}>
+            <View style={[styles.avatarContainer, { borderColor: user?.profile?.avatar_color || '#00FF88' }]}>
               <Ionicons name="person" size={48} color="#00FF88" />
             </View>
-            <Text style={styles.username}>{user?.username?.toUpperCase() || 'CODER'}</Text>
+            <Text style={styles.username}>{(user?.profile?.display_name || user?.username || 'CODER').toUpperCase()}</Text>
             <Text style={styles.email}>{user?.email}</Text>
           </View>
 
@@ -80,6 +113,32 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={styles.levelBar}>
+          {/* Profile Customization */}
+          <View style={styles.customizeCard}>
+            <Text style={styles.customizeTitle}>CUSTOMIZE PROFILE</Text>
+            <TextInput
+              style={styles.profileInput}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="DISPLAY NAME"
+              placeholderTextColor="#666"
+              maxLength={32}
+            />
+            <TextInput
+              style={[styles.profileInput, styles.bioInput]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="SHORT BIO"
+              placeholderTextColor="#666"
+              maxLength={160}
+              multiline
+            />
+            <TouchableOpacity style={styles.saveProfileButton} onPress={saveProfile}>
+              <Ionicons name="save" size={18} color="#0D0D0D" />
+              <Text style={styles.saveProfileText}>SAVE + DISPLAY 3 BADGES</Text>
+            </TouchableOpacity>
+          </View>
+
               <View
                 style={[
                   styles.levelProgress,
@@ -199,6 +258,91 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 44,
+  bioText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#CCC',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 10,
+    marginHorizontal: 12,
+  },
+  displayBadgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+    width: '100%',
+  },
+  displayBadgeSlot: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.35)',
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    gap: 6,
+  },
+  displayBadgeText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 6,
+    color: '#FFD700',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  emptyBadgeText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 6,
+    color: '#555',
+    textAlign: 'center',
+  },
+  customizeCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.2)',
+    gap: 12,
+  },
+  customizeTitle: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#00FF88',
+  },
+  profileInput: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#FFF',
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.25)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    paddingHorizontal: 12,
+  },
+  bioInput: {
+    minHeight: 76,
+    paddingTop: 12,
+    textAlignVertical: 'top',
+  },
+  saveProfileButton: {
+    minHeight: 48,
+    borderRadius: 10,
+    backgroundColor: '#00FF88',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  saveProfileText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#0D0D0D',
+  },
+
     height: 44,
     borderRadius: 12,
     backgroundColor: 'rgba(0, 255, 136, 0.1)',

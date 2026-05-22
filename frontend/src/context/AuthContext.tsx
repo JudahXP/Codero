@@ -12,6 +12,19 @@ interface User {
   hearts: number;
   badges: string[];
   friends: string[];
+  email_verified?: boolean;
+  profile?: {
+    display_name?: string;
+    bio?: string;
+    avatar_color?: string;
+    display_badges?: string[];
+  };
+  auth_methods?: {
+    password?: boolean;
+    email_verified?: boolean;
+    passkey_ready?: boolean;
+    google_ready?: boolean;
+  };
 }
 
 interface AuthContextType {

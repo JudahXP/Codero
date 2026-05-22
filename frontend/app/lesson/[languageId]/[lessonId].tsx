@@ -19,14 +19,18 @@ import { api } from '../../../src/services/api';
 import { useAuth } from '../../../src/context/AuthContext';
 
 interface Exercise {
-  type: 'multiple_choice' | 'code' | 'fill_blank';
+  type: 'multiple_choice' | 'code' | 'fill_blank' | 'write_code' | 'fix_broken_code' | 'predict_output' | 'drag_drop';
   question: string;
+  title?: string;
   options?: string[];
   correct?: number;
   starter?: string;
   solution?: string;
   hint?: string;
   answer?: string;
+  code?: string;
+  blocks?: string[];
+  correct_order?: string[];
 }
 
 interface Lesson {
@@ -53,6 +57,11 @@ export default function LessonScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [checking, setChecking] = useState(false);
+  const [feedback, setFeedback] = useState<{ correct: boolean; message: string; simple_explanation?: string; hint?: string; expected_answer?: any } | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [dragOrder, setDragOrder] = useState<string[]>([]);
+
 
   useEffect(() => {
     fetchLesson();
@@ -66,6 +75,9 @@ export default function LessonScreen() {
       if (response.data.exercises[0]?.starter) {
         setCodeInput(response.data.exercises[0].starter);
       }
+      if (response.data.exercises[0]?.blocks) {
+        setDragOrder(response.data.exercises[0].blocks);
+      }
     } catch (error) {
       console.error('Failed to fetch lesson:', error);
       Alert.alert('ERROR', 'Failed to load lesson');
@@ -75,30 +87,76 @@ export default function LessonScreen() {
     }
   };
 
-  const handleNext = () => {
-    if (!lesson) return;
-
+  const buildCurrentAnswer = () => {
+    if (!lesson) return null;
     const exercise = lesson.exercises[currentExercise];
-    let answer: any = null;
 
     if (exercise.type === 'multiple_choice') {
-      if (selectedOption === null) {
-        Alert.alert('SELECT ANSWER', 'Please select an option');
-        return;
+      if (selectedOption === null) return null;
+      return { selected: selectedOption };
+    }
+    if (exercise.type === 'predict_output') {
+      if (selectedOption !== null) return { selected: selectedOption };
+      if (fillInput.trim()) return { answer: fillInput };
+      return null;
+    }
+    if (['code', 'write_code', 'fix_broken_code'].includes(exercise.type)) {
+      if (!codeInput.trim()) return null;
+      return { code: codeInput };
+    }
+    if (exercise.type === 'drag_drop') {
+      return { order: dragOrder };
+    }
+    if (exercise.type === 'fill_blank') {
+      if (!fillInput.trim()) return null;
+      return { answer: fillInput };
+    }
+    return null;
+  };
+
+  const checkCurrentAnswer = async () => {
+    if (!lesson) return false;
+    const exercise = lesson.exercises[currentExercise];
+    const answer = buildCurrentAnswer();
+    if (!answer) {
+      Alert.alert('ANSWER NEEDED', 'Please complete this challenge first');
+      return false;
+    }
+    setChecking(true);
+    try {
+      const response = await api.post('/code/check', {
+        language: languageId,
+        lesson_id: lessonId,
+        exercise_index: currentExercise,
+        exercise,
+        answer,
+        save_wrong: true,
+      });
+      setFeedback(response.data);
+      if (!response.data.correct) {
+        setShowHint(true);
       }
-      answer = { selected: selectedOption };
-    } else if (exercise.type === 'code') {
-      if (!codeInput.trim()) {
-        Alert.alert('WRITE CODE', 'Please write some code');
-        return;
-      }
-      answer = { code: codeInput };
-    } else if (exercise.type === 'fill_blank') {
-      if (!fillInput.trim()) {
-        Alert.alert('FILL BLANK', 'Please fill in the blank');
-        return;
-      }
-      answer = { answer: fillInput };
+      return response.data.correct;
+    } catch (error: any) {
+      setFeedback({ correct: false, message: 'Could not check answer', simple_explanation: error.response?.data?.detail || 'Try again in a moment.' });
+      return false;
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (!lesson) return;
+
+    const answer = buildCurrentAnswer();
+    if (!answer) {
+      Alert.alert('ANSWER NEEDED', 'Please complete this challenge first');
+      return;
+    }
+
+    if (!feedback) {
+      await checkCurrentAnswer();
+      return;
     }
 
     const newAnswers = [...answers];
@@ -111,13 +169,15 @@ export default function LessonScreen() {
       setSelectedOption(null);
       setFillInput('');
       setShowHint(false);
+      setShowAnswer(false);
+      setFeedback(null);
       if (lesson.exercises[nextExercise]?.starter) {
-        setCodeInput(lesson.exercises[nextExercise].starter);
+        setCodeInput(lesson.exercises[nextExercise].starter || '');
       } else {
         setCodeInput('');
       }
+      setDragOrder(lesson.exercises[nextExercise]?.blocks || []);
     } else {
-      // Submit lesson
       submitLesson(newAnswers);
     }
   };
@@ -236,8 +296,12 @@ export default function LessonScreen() {
                 name={
                   exercise.type === 'multiple_choice'
                     ? 'list'
-                    : exercise.type === 'code'
+                    : ['code', 'write_code', 'fix_broken_code'].includes(exercise.type)
                     ? 'code-slash'
+                    : exercise.type === 'drag_drop'
+                    ? 'swap-vertical'
+                    : exercise.type === 'predict_output'
+                    ? 'eye'
                     : 'create'
                 }
                 size={16}
@@ -246,6 +310,14 @@ export default function LessonScreen() {
               <Text style={styles.typeText}>
                 {exercise.type === 'multiple_choice'
                   ? 'MULTIPLE CHOICE'
+                  : exercise.type === 'write_code'
+                  ? 'WRITE CODE'
+                  : exercise.type === 'fix_broken_code'
+                  ? 'FIX BROKEN CODE'
+                  : exercise.type === 'drag_drop'
+                  ? 'DRAG CODE BLOCKS'
+                  : exercise.type === 'predict_output'
+                  ? 'PREDICT OUTPUT'
                   : exercise.type === 'code'
                   ? 'CODE CHALLENGE'
                   : 'FILL THE BLANK'}
@@ -273,6 +345,30 @@ export default function LessonScreen() {
                     ]}>
                       {selectedOption === index && (
                         <Ionicons name="checkmark" size={14} color="#0D0D0D" />
+
+            {/* Drag Drop Blocks */}
+            {exercise.type === 'drag_drop' && (
+              <View style={styles.dragContainer}>
+                <Text style={styles.dragHelp}>Tap blocks to move them downward. Match the correct code order.</Text>
+                {dragOrder.map((block, index) => (
+                  <TouchableOpacity
+                    key={`${block}-${index}`}
+                    style={styles.dragBlock}
+                    onPress={() => {
+                      const next = [...dragOrder];
+                      const swapWith = index === next.length - 1 ? 0 : index + 1;
+                      [next[index], next[swapWith]] = [next[swapWith], next[index]];
+                      setDragOrder(next);
+                      setFeedback(null);
+                    }}
+                  >
+                    <Text style={styles.dragIndex}>{index + 1}</Text>
+                    <Text style={styles.dragText}>{block}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
                       )}
                     </View>
                     <Text style={[
@@ -286,8 +382,44 @@ export default function LessonScreen() {
               </View>
             )}
 
+            {/* Predict Output */}
+            {exercise.type === 'predict_output' && (
+              <View style={styles.codeContainer}>
+                <Text style={styles.codePreview}>{exercise.code}</Text>
+                {exercise.options?.map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.optionButton, selectedOption === index && styles.optionSelected]}
+                    onPress={() => setSelectedOption(index)}
+                  >
+                    <Text style={[styles.optionText, selectedOption === index && styles.optionTextSelected]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+
+            {/* Instant Feedback */}
+            {feedback && (
+              <View style={[styles.feedbackBox, feedback.correct ? styles.feedbackSuccess : styles.feedbackError]}>
+                <Ionicons name={feedback.correct ? 'checkmark-circle' : 'alert-circle'} size={20} color={feedback.correct ? '#00FF88' : '#FF6B6B'} />
+                <View style={styles.feedbackTextWrap}>
+                  <Text style={styles.feedbackTitle}>{feedback.correct ? 'Success!' : 'Not quite yet'}</Text>
+                  <Text style={styles.feedbackText}>{feedback.simple_explanation || feedback.message}</Text>
+                  {!feedback.correct && feedback.expected_answer && showAnswer && (
+                    <Text style={styles.answerText}>Answer: {Array.isArray(feedback.expected_answer) ? feedback.expected_answer.join(' / ') : String(feedback.expected_answer)}</Text>
+                  )}
+                  {!feedback.correct && !showAnswer && (
+                    <TouchableOpacity style={styles.showAnswerButton} onPress={() => setShowAnswer(true)}>
+                      <Text style={styles.showAnswerText}>Show full answer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Code Input */}
-            {exercise.type === 'code' && (
+            {['code', 'write_code', 'fix_broken_code'].includes(exercise.type) && (
               <View style={styles.codeContainer}>
                 <TextInput
                   style={styles.codeInput}
@@ -341,18 +473,18 @@ export default function LessonScreen() {
             <TouchableOpacity
               style={styles.submitButton}
               onPress={handleNext}
-              disabled={submitting}
+              disabled={submitting || checking}
             >
               <LinearGradient
                 colors={['#00FF88', '#00CC6A']}
                 style={styles.submitGradient}
               >
-                {submitting ? (
+                {submitting || checking ? (
                   <ActivityIndicator color="#0D0D0D" />
                 ) : (
                   <>
                     <Text style={styles.submitText}>
-                      {currentExercise < (lesson?.exercises.length || 1) - 1 ? 'NEXT' : 'FINISH'}
+                      {!feedback ? (['code', 'write_code', 'fix_broken_code'].includes(exercise.type) ? 'RUN CODE' : 'CHECK ANSWER') : currentExercise < (lesson?.exercises.length || 1) - 1 ? 'NEXT' : 'FINISH'}
                     </Text>
                     <Ionicons name="arrow-forward" size={20} color="#0D0D0D" />
                   </>
@@ -500,6 +632,49 @@ const styles = StyleSheet.create({
     padding: 16,
     minHeight: 150,
   },
+  codePreview: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#00FF88',
+    padding: 16,
+    lineHeight: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  dragContainer: {
+    gap: 10,
+  },
+  dragHelp: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#888',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  dragBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.35)',
+    padding: 14,
+    minHeight: 48,
+  },
+  dragIndex: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#00FF88',
+  },
+  dragText: {
+    flex: 1,
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#FFF',
+    lineHeight: 16,
+  },
+
   fillContainer: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
@@ -529,6 +704,56 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 12,
     padding: 16,
+  feedbackBox: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  feedbackSuccess: {
+    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+    borderColor: 'rgba(0, 255, 136, 0.35)',
+  },
+  feedbackError: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderColor: 'rgba(255, 107, 107, 0.35)',
+  },
+  feedbackTextWrap: {
+    flex: 1,
+    gap: 6,
+  },
+  feedbackTitle: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 9,
+    color: '#FFF',
+  },
+  feedbackText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#DDD',
+    lineHeight: 16,
+  },
+  answerText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#00FF88',
+    lineHeight: 16,
+  },
+  showAnswerButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  showAnswerText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 7,
+    color: '#FFD700',
+  },
+
     marginTop: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.3)',
