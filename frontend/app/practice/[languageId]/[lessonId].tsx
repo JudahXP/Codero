@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
+import { safeBack } from '../../../src/utils/navigation';
+
 
 interface PracticeContent {
   explanation: string;
@@ -199,7 +201,7 @@ export default function PracticeModeScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => safeBack(router, '/home')}>
               <Ionicons name="close" size={24} color="#00BFFF" />
             </TouchableOpacity>
             <View style={styles.modeTabs}>

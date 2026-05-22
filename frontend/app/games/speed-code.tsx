@@ -18,12 +18,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { safeBack } from '../../src/utils/navigation';
+import { useAppSettings } from '../../src/context/SettingsContext';
 import * as Haptics from 'expo-haptics';
 
 export default function SpeedCodeScreen() {
   const router = useRouter();
   const { lang } = useLocalSearchParams<{ lang: string }>();
   const { refreshUser } = useAuth();
+  const { playSound } = useAppSettings();
   const language = lang || 'python';
   const [challenges, setChallenges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +45,7 @@ export default function SpeedCodeScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const handleExit = useCallback(() => {
-    if (gameOver || !started) { router.back(); return; }
+    if (gameOver || !started) { safeBack(router, '/games'); return; }
     if (timerRef.current) clearInterval(timerRef.current);
     Alert.alert('QUIT GAME?', 'Your progress will be lost!', [
       { text: 'KEEP PLAYING', style: 'cancel', onPress: () => {
@@ -52,7 +55,7 @@ export default function SpeedCodeScreen() {
           }, 1000);
         }
       }},
-      { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+      { text: 'QUIT', style: 'destructive', onPress: () => safeBack(router, '/games') },
     ]);
   }, [gameOver, started, router, checked, timeLeft]);
 
@@ -85,7 +88,7 @@ export default function SpeedCodeScreen() {
       setChallenges(res.data.challenges);
     } catch (e) {
       Alert.alert('ERROR', 'Failed to load challenges');
-      router.back();
+      safeBack(router, '/games');
     } finally {
       setLoading(false);
     }
@@ -197,7 +200,7 @@ export default function SpeedCodeScreen() {
               <Ionicons name="refresh" size={18} color="#FFD700" />
               <Text style={styles.playAgainText}>PLAY AGAIN</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => safeBack(router, '/games')}>
               <Text style={styles.backBtnText}>BACK TO GAMES</Text>
             </TouchableOpacity>
           </View>
@@ -231,7 +234,7 @@ export default function SpeedCodeScreen() {
                 <Text style={styles.goText}>GO!</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => safeBack(router, '/games')}>
               <Text style={styles.backBtnText}>BACK TO GAMES</Text>
             </TouchableOpacity>
           </View>

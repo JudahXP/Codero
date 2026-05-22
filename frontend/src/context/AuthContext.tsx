@@ -10,8 +10,22 @@ interface User {
   level: number;
   streak: number;
   hearts: number;
+  gems?: number;
   badges: string[];
   friends: string[];
+  settings?: {
+    font_size?: 'small' | 'medium' | 'large';
+    high_contrast?: boolean;
+    reduced_motion?: boolean;
+    sound_effects?: boolean;
+    notifications?: boolean;
+    daily_reminder?: boolean;
+    email_login?: boolean;
+    email_join?: boolean;
+    email_vip?: boolean;
+    email_daily?: boolean;
+    theme?: 'dark' | 'light';
+  };
   email_verified?: boolean;
   profile?: {
     display_name?: string;

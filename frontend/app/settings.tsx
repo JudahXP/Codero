@@ -1,255 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Switch,
-  Alert,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/services/api';
-
-interface Settings {
-  font_size: 'small' | 'medium' | 'large';
-  high_contrast: boolean;
-  reduced_motion: boolean;
-  sound_effects: boolean;
-  notifications: boolean;
-  daily_reminder: boolean;
-  theme: 'dark' | 'light';
-}
+import { useAppSettings, AppSettings } from '../src/context/SettingsContext';
+import { safeBack } from '../src/utils/navigation';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
-  const [settings, setSettings] = useState<Settings>({
-    font_size: 'medium',
-    high_contrast: false,
-    reduced_motion: false,
-    sound_effects: true,
-    notifications: true,
-    daily_reminder: true,
-    theme: 'dark',
-  });
+  const { settings, colors, gradient, fontScale, updateSetting, playSound } = useAppSettings();
   const [saving, setSaving] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('login');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
 
+  useEffect(() => { fetchTemplates(); }, []);
   useEffect(() => {
-    if (user?.settings) {
-      setSettings({ ...settings, ...user.settings });
-    }
-  }, [user]);
+    const t = templates.find((template) => template.event === selectedTemplate);
+    if (t) { setSubject(t.subject); setBody(t.body); }
+  }, [selectedTemplate, templates]);
 
-  const updateSetting = async (key: keyof Settings, value: any) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-
+  const safeUpdate = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     try {
       setSaving(true);
-      await api.put('/settings', { settings: newSettings });
-      await refreshUser();
+      playSound('tap');
+      await updateSetting(key, value);
+      playSound('success');
     } catch (error) {
-      console.error('Failed to save settings:', error);
-      Alert.alert('ERROR', 'Failed to save settings');
+      playSound('error');
+      Alert.alert('ERROR', 'Failed to save setting');
     } finally {
       setSaving(false);
     }
   };
 
-  const fontSizeLabel = {
-    small: 'SMALL',
-    medium: 'MEDIUM',
-    large: 'LARGE',
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/email/templates');
+      setTemplates(response.data);
+    } catch (error) {
+      setTemplates([]);
+    }
+  };
+
+  const saveTemplate = async () => {
+    try {
+      await api.put(`/email/templates/${selectedTemplate}`, { subject, body });
+      await fetchTemplates();
+      playSound('success');
+      Alert.alert('SAVED', 'Email template saved.');
+    } catch (error: any) {
+      playSound('error');
+      Alert.alert('ERROR', error.response?.data?.detail || 'Template save failed');
+    }
+  };
+
+  const sendTest = async () => {
+    try {
+      await api.post('/email/send-test', { event: selectedTemplate });
+      playSound('notify');
+      Alert.alert('QUEUED', 'Test email has been queued.');
+    } catch (error: any) {
+      playSound('error');
+      Alert.alert('ERROR', error.response?.data?.detail || 'Could not send test email');
+    }
   };
 
   const cycleFontSize = () => {
-    const sizes: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
-    const currentIndex = sizes.indexOf(settings.font_size);
-    const nextIndex = (currentIndex + 1) % sizes.length;
-    updateSetting('font_size', sizes[nextIndex]);
+    const sizes: AppSettings['font_size'][] = ['small', 'medium', 'large'];
+    const next = sizes[(sizes.indexOf(settings.font_size) + 1) % sizes.length];
+    safeUpdate('font_size', next);
   };
 
+  const Row = ({ icon, color, label, desc, children }: any) => (
+    <View style={[styles.settingRow, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+      <View style={styles.settingLeft}>
+        <View style={[styles.settingIcon, { backgroundColor: colors.card }]}> 
+          <Ionicons name={icon} size={20} color={color} />
+        </View>
+        <View style={styles.settingTextWrap}>
+          <Text style={[styles.settingLabel, { color: colors.text, fontSize: 9 * fontScale }]}>{label}</Text>
+          <Text style={[styles.settingDesc, { color: colors.textMuted }]}>{desc}</Text>
+        </View>
+      </View>
+      {children}
+    </View>
+  );
+
   return (
-    <LinearGradient colors={['#0D0D0D', '#1A1A2E', '#0D0D0D']} style={styles.container}>
+    <LinearGradient colors={gradient} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#00FF88" />
+          <TouchableOpacity style={[styles.backButton, { borderColor: colors.primary, backgroundColor: colors.surface }]} onPress={() => safeBack(router)}>
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.title}>SETTINGS</Text>
+          <Text style={[styles.title, { color: colors.primary, fontSize: 14 * fontScale }]}>SETTINGS</Text>
           <View style={{ width: 44 }} />
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {/* Accessibility Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="accessibility" size={20} color="#00FF88" />
-              <Text style={styles.sectionTitle}>ACCESSIBILITY</Text>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>ACCESSIBILITY</Text>
+            <Row icon="text" color={colors.info} label="FONT SIZE" desc="Tap to cycle small, medium, large">
+              <TouchableOpacity style={[styles.fontSizeButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={cycleFontSize}>
+                <Text style={[styles.fontSizeText, { color: colors.primary }]}>{settings.font_size.toUpperCase()}</Text>
+              </TouchableOpacity>
+            </Row>
+            <Row icon="contrast" color={colors.warning} label="HIGH CONTRAST" desc="Maximum readability colors">
+              <Switch value={settings.high_contrast} onValueChange={(v) => safeUpdate('high_contrast', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor={settings.high_contrast ? colors.warning : '#FFF'} />
+            </Row>
+            <Row icon="sunny" color={colors.warning} label="LIGHT MODE" desc="Switch full UI colors">
+              <Switch value={settings.theme === 'light'} onValueChange={(v) => safeUpdate('theme', v ? 'light' : 'dark')} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="flash-off" color={colors.danger} label="REDUCED MOTION" desc="Minimize animations">
+              <Switch value={settings.reduced_motion} onValueChange={(v) => safeUpdate('reduced_motion', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>SOUND + NOTIFICATIONS</Text>
+            <Row icon="volume-high" color="#8A2BE2" label="SOUND EFFECTS" desc="Sleek tap/success/error sounds">
+              <Switch value={settings.sound_effects} onValueChange={(v) => safeUpdate('sound_effects', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="notifications" color={colors.primary} label="ALL EMAIL NOTIFICATIONS" desc="Master email notification switch">
+              <Switch value={settings.notifications} onValueChange={(v) => safeUpdate('notifications', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="log-in" color={colors.info} label="LOGIN EMAILS" desc="Email when someone logs in">
+              <Switch value={settings.email_login} onValueChange={(v) => safeUpdate('email_login', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="person-add" color={colors.primary} label="JOIN EMAILS" desc="Welcome emails after account creation">
+              <Switch value={settings.email_join} onValueChange={(v) => safeUpdate('email_join', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="star" color={colors.warning} label="VIP EMAILS" desc="VIP activation and perk notices">
+              <Switch value={settings.email_vip} onValueChange={(v) => safeUpdate('email_vip', v)} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+            <Row icon="alarm" color={colors.warning} label="DAILY REMINDERS" desc="Practice reminder emails">
+              <Switch value={settings.daily_reminder && settings.email_daily} onValueChange={(v) => { safeUpdate('daily_reminder', v); safeUpdate('email_daily', v); }} trackColor={{ false: '#777', true: colors.primary }} thumbColor="#FFF" />
+            </Row>
+          </View>
+
+          <View style={[styles.emailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>EMAIL TEMPLATES</Text>
+            <Text style={[styles.settingDesc, { color: colors.textMuted }]}>Use variables: {'{username}'}, {'{email}'}, {'{time}'}, {'{vip_until}'}</Text>
+            <View style={styles.templateTabs}>
+              {['login', 'join', 'vip', 'daily', 'test'].map((event) => (
+                <TouchableOpacity key={event} style={[styles.templateTab, selectedTemplate === event && { backgroundColor: colors.primary }]} onPress={() => setSelectedTemplate(event)}>
+                  <Text style={[styles.templateTabText, { color: selectedTemplate === event ? colors.primaryText : colors.text }]}>{event.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-
-            {/* Font Size */}
-            <TouchableOpacity style={styles.settingRow} onPress={cycleFontSize}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(0, 191, 255, 0.1)' }]}>
-                  <Ionicons name="text" size={20} color="#00BFFF" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>FONT SIZE</Text>
-                  <Text style={styles.settingDesc}>Adjust text size</Text>
-                </View>
-              </View>
-              <View style={styles.fontSizeButton}>
-                <Text style={styles.fontSizeText}>{fontSizeLabel[settings.font_size]}</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* High Contrast */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(255, 215, 0, 0.1)' }]}>
-                  <Ionicons name="contrast" size={20} color="#FFD700" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>HIGH CONTRAST</Text>
-                  <Text style={styles.settingDesc}>Increase color contrast</Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.high_contrast}
-                onValueChange={(value) => updateSetting('high_contrast', value)}
-                trackColor={{ false: '#333', true: '#00FF88' }}
-                thumbColor={settings.high_contrast ? '#FFF' : '#888'}
-              />
-            </View>
-
-            {/* Reduced Motion */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(255, 107, 107, 0.1)' }]}>
-                  <Ionicons name="flash-off" size={20} color="#FF6B6B" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>REDUCED MOTION</Text>
-                  <Text style={styles.settingDesc}>Minimize animations</Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.reduced_motion}
-                onValueChange={(value) => updateSetting('reduced_motion', value)}
-                trackColor={{ false: '#333', true: '#00FF88' }}
-                thumbColor={settings.reduced_motion ? '#FFF' : '#888'}
-              />
+            <TextInput style={[styles.emailInput, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]} value={subject} onChangeText={setSubject} placeholder="Email subject" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[styles.emailInput, styles.emailBody, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]} value={body} onChangeText={setBody} placeholder="Email body" placeholderTextColor={colors.textMuted} multiline />
+            <View style={styles.emailButtons}>
+              <TouchableOpacity style={[styles.emailButton, { backgroundColor: colors.primary }]} onPress={saveTemplate}>
+                <Text style={[styles.emailButtonText, { color: colors.primaryText }]}>SAVE TEMPLATE</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.emailButton, { backgroundColor: colors.info }]} onPress={sendTest}>
+                <Text style={[styles.emailButtonText, { color: '#FFF' }]}>SEND TEST</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Sound & Notifications Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="notifications" size={20} color="#00FF88" />
-              <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
-            </View>
-
-            {/* Sound Effects */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(138, 43, 226, 0.1)' }]}>
-                  <Ionicons name="volume-high" size={20} color="#8A2BE2" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>SOUND EFFECTS</Text>
-                  <Text style={styles.settingDesc}>Play audio feedback</Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.sound_effects}
-                onValueChange={(value) => updateSetting('sound_effects', value)}
-                trackColor={{ false: '#333', true: '#00FF88' }}
-                thumbColor={settings.sound_effects ? '#FFF' : '#888'}
-              />
-            </View>
-
-            {/* Push Notifications */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(0, 255, 136, 0.1)' }]}>
-                  <Ionicons name="notifications" size={20} color="#00FF88" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>NOTIFICATIONS</Text>
-                  <Text style={styles.settingDesc}>Push notifications</Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.notifications}
-                onValueChange={(value) => updateSetting('notifications', value)}
-                trackColor={{ false: '#333', true: '#00FF88' }}
-                thumbColor={settings.notifications ? '#FFF' : '#888'}
-              />
-            </View>
-
-            {/* Daily Reminder */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: 'rgba(255, 165, 0, 0.1)' }]}>
-                  <Ionicons name="alarm" size={20} color="#FFA500" />
-                </View>
-                <View>
-                  <Text style={styles.settingLabel}>DAILY REMINDER</Text>
-                  <Text style={styles.settingDesc}>Practice reminder</Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.daily_reminder}
-                onValueChange={(value) => updateSetting('daily_reminder', value)}
-                trackColor={{ false: '#333', true: '#00FF88' }}
-                thumbColor={settings.daily_reminder ? '#FFF' : '#888'}
-              />
-            </View>
-          </View>
-
-          {/* About Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="information-circle" size={20} color="#00FF88" />
-              <Text style={styles.sectionTitle}>ABOUT</Text>
-            </View>
-
-            <View style={styles.aboutCard}>
-              <Text style={styles.appName}>CODERO</Text>
-              <Text style={styles.appVersion}>VERSION 2.0</Text>
-              <Text style={styles.appDesc}>LEARN TO CODE LIKE A GAME</Text>
-            </View>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Ionicons name="language" size={24} color="#00BFFF" />
-                <Text style={styles.statValue}>20</Text>
-                <Text style={styles.statLabel}>LANGUAGES</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Ionicons name="book" size={24} color="#FFD700" />
-                <Text style={styles.statValue}>600+</Text>
-                <Text style={styles.statLabel}>LESSONS</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Ionicons name="help-circle" size={24} color="#FF6B6B" />
-                <Text style={styles.statValue}>6000+</Text>
-                <Text style={styles.statLabel}>EXERCISES</Text>
-              </View>
-            </View>
-          </View>
-
-          {saving && (
-            <Text style={styles.savingText}>SAVING...</Text>
-          )}
-
+          {saving && <Text style={[styles.savingText, { color: colors.primary }]}>SAVING...</Text>}
           <View style={styles.bottomPadding} />
         </ScrollView>
       </SafeAreaView>
@@ -258,160 +173,32 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
-    borderWidth: 1,
-    borderColor: '#00FF88',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 14,
-    color: '#00FF88',
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 10,
-    color: '#00FF88',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  settingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  settingLabel: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#FFF',
-  },
-  settingDesc: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 6,
-    color: '#888',
-    marginTop: 2,
-  },
-  fontSizeButton: {
-    backgroundColor: 'rgba(0, 255, 136, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#00FF88',
-  },
-  fontSizeText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#00FF88',
-  },
-  aboutCard: {
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 136, 0.3)',
-    marginBottom: 16,
-  },
-  appName: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 20,
-    color: '#00FF88',
-    marginBottom: 8,
-  },
-  appVersion: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#888',
-    marginBottom: 4,
-  },
-  appDesc: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 7,
-    color: '#AAA',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  statValue: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 14,
-    color: '#FFF',
-    marginVertical: 6,
-  },
-  statLabel: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 6,
-    color: '#888',
-  },
-  savingText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#00FF88',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  bottomPadding: {
-    height: 40,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
+  backButton: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontFamily: 'PressStart2P_400Regular' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, gap: 22 },
+  section: { gap: 10 },
+  sectionTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, marginBottom: 6 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, padding: 14, borderWidth: 1, gap: 12, minHeight: 64 },
+  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  settingIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  settingTextWrap: { flex: 1, gap: 4 },
+  settingLabel: { fontFamily: 'PressStart2P_400Regular' },
+  settingDesc: { fontSize: 12, lineHeight: 17 },
+  fontSizeButton: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, minWidth: 90, alignItems: 'center' },
+  fontSizeText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8 },
+  emailCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
+  templateTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  templateTab: { borderRadius: 999, paddingVertical: 9, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.08)' },
+  templateTabText: { fontFamily: 'PressStart2P_400Regular', fontSize: 7 },
+  emailInput: { minHeight: 48, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14 },
+  emailBody: { minHeight: 150, textAlignVertical: 'top', lineHeight: 20 },
+  emailButtons: { flexDirection: 'row', gap: 10 },
+  emailButton: { flex: 1, minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  emailButtonText: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, textAlign: 'center' },
+  savingText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, textAlign: 'center' },
+  bottomPadding: { height: 40 },
 });

@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/services/api';
 import { useAuth } from '../../../src/context/AuthContext';
+import { safeBack } from '../../../src/utils/navigation';
+
 
 interface Exercise {
   type: 'multiple_choice' | 'code' | 'fill_blank' | 'write_code' | 'fix_broken_code' | 'predict_output' | 'drag_drop';
@@ -81,7 +83,7 @@ export default function LessonScreen() {
     } catch (error) {
       console.error('Failed to fetch lesson:', error);
       Alert.alert('ERROR', 'Failed to load lesson');
-      router.back();
+      safeBack(router, '/home');
     } finally {
       setLoading(false);
     }
@@ -246,7 +248,7 @@ export default function LessonScreen() {
 
             <TouchableOpacity
               style={styles.continueButton}
-              onPress={() => router.back()}
+              onPress={() => safeBack(router, '/home')}
             >
               <LinearGradient
                 colors={['#00FF88', '#00CC6A']}
@@ -273,7 +275,7 @@ export default function LessonScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => safeBack(router, '/home')}>
               <Ionicons name="close" size={24} color="#FF6B6B" />
             </TouchableOpacity>
             <View style={styles.progressBar}>
@@ -703,6 +705,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 12,
     padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  hintText: {
+    fontFamily: 'PressStart2P_400Regular',
+    fontSize: 8,
+    color: '#FFD700',
+    lineHeight: 16,
+  },
   feedbackBox: {
     flexDirection: 'row',
     gap: 12,
@@ -729,16 +741,14 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   feedbackText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
+    fontSize: 13,
     color: '#DDD',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   answerText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
+    fontSize: 13,
     color: '#00FF88',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   showAnswerButton: {
     alignSelf: 'flex-start',
@@ -751,17 +761,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P_400Regular',
     fontSize: 7,
     color: '#FFD700',
-  },
-
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
-  },
-  hintText: {
-    fontFamily: 'PressStart2P_400Regular',
-    fontSize: 8,
-    color: '#FFD700',
-    lineHeight: 16,
   },
   footer: {
     padding: 20,

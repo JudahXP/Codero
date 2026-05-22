@@ -15,12 +15,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { safeBack } from '../../src/utils/navigation';
+import { useAppSettings } from '../../src/context/SettingsContext';
 import * as Haptics from 'expo-haptics';
 
 export default function CodePuzzleScreen() {
   const router = useRouter();
   const { lang } = useLocalSearchParams<{ lang: string }>();
   const { refreshUser } = useAuth();
+  const { playSound } = useAppSettings();
   const language = lang || 'python';
   const [puzzles, setPuzzles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,10 +38,10 @@ export default function CodePuzzleScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleExit = useCallback(() => {
-    if (gameOver) { router.back(); return; }
+    if (gameOver) { safeBack(router, '/games'); return; }
     Alert.alert('QUIT GAME?', 'Your progress will be lost!', [
       { text: 'KEEP PLAYING', style: 'cancel' },
-      { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+      { text: 'QUIT', style: 'destructive', onPress: () => safeBack(router, '/games') },
     ]);
   }, [gameOver, router]);
 
@@ -58,7 +61,7 @@ export default function CodePuzzleScreen() {
       }
     } catch (e) {
       Alert.alert('ERROR', 'Failed to load puzzles');
-      router.back();
+      safeBack(router, '/games');
     } finally {
       setLoading(false);
     }
@@ -169,7 +172,7 @@ export default function CodePuzzleScreen() {
               <Ionicons name="refresh" size={18} color="#00BFFF" />
               <Text style={styles.playAgainText}>PLAY AGAIN</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => safeBack(router, '/games')}>
               <Text style={styles.backBtnText}>BACK TO GAMES</Text>
             </TouchableOpacity>
           </View>

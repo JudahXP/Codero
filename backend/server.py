@@ -2,7 +2,6 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Backgro
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import Request
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -86,6 +85,14 @@ class VerifyEmailRequest(BaseModel):
     email: EmailStr
     code: str
 
+class EmailTemplateUpdate(BaseModel):
+    subject: str
+    body: str
+
+class EmailTestRequest(BaseModel):
+    event: str
+    email: Optional[EmailStr] = None
+
 # ============== HELPER FUNCTIONS ==============
 
 def hash_password(password: str) -> str:
@@ -126,6 +133,7 @@ def public_user(user: dict) -> dict:
         "google_ready": True,
     })
     clean.setdefault("email_verified", clean.get("auth_methods", {}).get("email_verified", False))
+    clean["settings"] = merge_settings(clean.get("settings", {}))
     clean["is_vip"] = is_vip_active(clean)
     clean["vip_perks"] = get_vip_perks(clean)
     return clean
@@ -210,6 +218,105 @@ def send_verification_email(to_email: str, code: str):
         logger.error("Verification email delivery failed for %s: %s", to_email, exc)
     except Exception as exc:
         logger.error("Unexpected verification email error for %s: %s", to_email, exc)
+
+EMAIL_TEMPLATE_DEFAULTS = {
+    "join": {
+        "subject": "Welcome to Codero, {username}!",
+        "body": "Hi {username},\n\nWelcome to Codero. Your coding journey starts now.\n\nOpen Codero and press Continue Learning to begin.\n\n- Codero Team",
+    },
+    "login": {
+        "subject": "New Codero login",
+        "body": "Hi {username},\n\nYour Codero account was just logged into at {time}.\n\nIf this was you, no action is needed.\n\n- Codero Team",
+    },
+    "vip": {
+        "subject": "Codero VIP activated",
+        "body": "Hi {username},\n\nYour VIP perks are active. Enjoy extra hearts, bonus gems, and VIP badges.\n\n- Codero Team",
+    },
+    "daily": {
+        "subject": "Your Codero daily practice reminder",
+        "body": "Hi {username},\n\nA quick coding session keeps your streak alive. Press Continue Learning when you are ready.\n\n- Codero Team",
+    },
+    "test": {
+        "subject": "Codero email test",
+        "body": "Hi {username},\n\nThis is a test email from your Codero notification settings.\n\n- Codero Team",
+    },
+}
+
+DEFAULT_SETTINGS = {
+    "font_size": "medium",
+    "high_contrast": False,
+    "reduced_motion": False,
+    "sound_effects": True,
+    "notifications": True,
+    "daily_reminder": True,
+    "email_login": True,
+    "email_join": True,
+    "email_vip": True,
+    "email_daily": True,
+    "theme": "dark",
+}
+
+def merge_settings(settings: Optional[dict]) -> dict:
+    return {**DEFAULT_SETTINGS, **(settings or {})}
+
+async def get_email_template(event: str) -> dict:
+    template = await db.email_templates.find_one({"event": event})
+    if template:
+        return {"subject": template.get("subject", "Codero"), "body": template.get("body", "")}
+    return EMAIL_TEMPLATE_DEFAULTS.get(event, EMAIL_TEMPLATE_DEFAULTS["test"])
+
+def render_template(text: str, context: dict) -> str:
+    rendered = text
+    for key, value in context.items():
+        rendered = rendered.replace("{" + key + "}", str(value))
+    return rendered
+
+def send_email_message(to_email: str, subject: str, body: str):
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not smtp_user or not smtp_pass:
+        logger.warning("SMTP credentials are not configured; notification email not sent")
+        return
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg.set_content(body)
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logger.info("Notification email sent to %s (%s)", to_email, subject)
+    except Exception as exc:
+        logger.error("Notification email delivery failed for %s: %s", to_email, exc)
+
+async def queue_user_email(background_tasks: BackgroundTasks, user: dict, event: str, context: Optional[dict] = None, force: bool = False):
+    settings = merge_settings(user.get("settings"))
+    event_flag = f"email_{event}"
+    if not force and (not settings.get("notifications", True) or not settings.get(event_flag, True)):
+        logger.info("Skipping %s email for %s because notification settings are off", event, user.get("email"))
+        return False
+    template = await get_email_template(event)
+    payload = {
+        "username": user.get("username", "Coder"),
+        "email": user.get("email", ""),
+        "time": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        **(context or {}),
+    }
+    subject = render_template(template["subject"], payload)
+    body = render_template(template["body"], payload)
+    background_tasks.add_task(send_email_message, user["email"], subject, body)
+    await db.email_events.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user.get("id"),
+        "email": user.get("email"),
+        "event": event,
+        "subject": subject,
+        "created_at": datetime.utcnow().isoformat(),
+    })
+    return True
+
 
 def get_vip_perks(user: dict) -> dict:
     """Get VIP perks for user"""
@@ -1230,7 +1337,7 @@ def generate_daily_challenge() -> dict:
 # ============== AUTH ROUTES ==============
 
 @api_router.post("/auth/register")
-async def register(user: UserCreate):
+async def register(user: UserCreate, background_tasks: BackgroundTasks):
     existing = await db.users.find_one({"$or": [{"email": user.email}, {"username": user.username}]})
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
@@ -1260,15 +1367,7 @@ async def register(user: UserCreate):
         "hints_used_today": 0,
         "vip_until": None,  # VIP expiration date
         "vip_months": 0,
-        "settings": {
-            "font_size": "medium",
-            "high_contrast": False,
-            "reduced_motion": False,
-            "sound_effects": True,
-            "notifications": True,
-            "daily_reminder": True,
-            "theme": "dark",
-        },
+        "settings": DEFAULT_SETTINGS.copy(),
         "daily_challenges_completed": [],
         "profile": {
             "display_name": user.username,
@@ -1287,13 +1386,15 @@ async def register(user: UserCreate):
     }
     await db.users.insert_one(user_dict)
     
+    await queue_user_email(background_tasks, user_dict, "join")
+
     token = generate_token()
     await db.sessions.insert_one({"token": token, "user_id": user_dict["id"]})
     
     return {"token": token, "user": public_user(user_dict)}
 
 @api_router.post("/auth/login")
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": credentials.email})
     if not user or user["password"] != hash_password(credentials.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -1328,6 +1429,7 @@ async def login(credentials: UserLogin):
     await db.sessions.insert_one({"token": token, "user_id": user["id"]})
     
     user.update(update_fields)
+    await queue_user_email(background_tasks, user, "login")
     return {"token": token, "user": public_user(user)}
 
 @api_router.get("/auth/me")
@@ -1449,7 +1551,7 @@ async def get_vip_status(user: dict = Depends(get_current_user)):
     }
 
 @api_router.post("/vip/subscribe")
-async def subscribe_vip(purchase: VIPPurchase, user: dict = Depends(get_current_user)):
+async def subscribe_vip(purchase: VIPPurchase, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Subscribe to VIP (simulated payment)"""
     # In production, integrate with Stripe/PayPal
     now = datetime.utcnow()
@@ -1483,6 +1585,10 @@ async def subscribe_vip(purchase: VIPPurchase, user: dict = Depends(get_current_
             "badges": badges,
         }}
     )
+
+    notify_user = dict(user)
+    notify_user.update({"vip_until": new_expiry.isoformat(), "vip_months": vip_months, "badges": badges})
+    await queue_user_email(background_tasks, notify_user, "vip", {"vip_until": new_expiry.isoformat()})
     
     return {
         "success": True,
@@ -1495,12 +1601,45 @@ async def subscribe_vip(purchase: VIPPurchase, user: dict = Depends(get_current_
 
 @api_router.put("/settings")
 async def update_settings(settings_update: SettingsUpdate, user: dict = Depends(get_current_user)):
-    await db.users.update_one({"id": user["id"]}, {"$set": {"settings": settings_update.settings}})
-    return {"message": "Settings updated", "settings": settings_update.settings}
+    merged = merge_settings({**user.get("settings", {}), **settings_update.settings})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"settings": merged}})
+    return {"message": "Settings updated", "settings": merged}
 
 @api_router.get("/settings")
 async def get_settings(user: dict = Depends(get_current_user)):
-    return user.get("settings", {})
+    return merge_settings(user.get("settings", {}))
+
+@api_router.get("/email/templates")
+async def list_email_templates(user: dict = Depends(get_current_user)):
+    templates = []
+    for event, fallback in EMAIL_TEMPLATE_DEFAULTS.items():
+        saved = await db.email_templates.find_one({"event": event})
+        templates.append({
+            "event": event,
+            "subject": (saved or fallback).get("subject"),
+            "body": (saved or fallback).get("body"),
+            "variables": ["username", "email", "time", "vip_until"],
+        })
+    return templates
+
+@api_router.put("/email/templates/{event}")
+async def update_email_template(event: str, template: EmailTemplateUpdate, user: dict = Depends(get_current_user)):
+    if event not in EMAIL_TEMPLATE_DEFAULTS:
+        raise HTTPException(status_code=400, detail="Unknown email event")
+    await db.email_templates.update_one(
+        {"event": event},
+        {"$set": {"event": event, "subject": template.subject[:120], "body": template.body[:4000], "updated_by": user["id"], "updated_at": datetime.utcnow().isoformat()}},
+        upsert=True,
+    )
+    return {"message": "Template saved", "event": event}
+
+@api_router.post("/email/send-test")
+async def send_test_email(request: EmailTestRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
+    event = request.event if request.event in EMAIL_TEMPLATE_DEFAULTS else "test"
+    target = request.email or user["email"]
+    test_user = {**user, "email": str(target)}
+    sent = await queue_user_email(background_tasks, test_user, event, force=True)
+    return {"message": "Test email queued" if sent else "Email not queued", "event": event, "email": str(target)}
 
 # ============== LANGUAGE ROUTES ==============
 

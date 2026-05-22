@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { safeBack } from '../../src/utils/navigation';
+import { useAppSettings } from '../../src/context/SettingsContext';
 import * as Haptics from 'expo-haptics';
 
 interface Challenge {
@@ -29,6 +31,7 @@ export default function BugHunterScreen() {
   const router = useRouter();
   const { lang } = useLocalSearchParams<{ lang: string }>();
   const { refreshUser } = useAuth();
+  const { playSound } = useAppSettings();
   const language = lang || 'python';
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,7 @@ export default function BugHunterScreen() {
   // Exit confirmation - back handler
   const handleExit = useCallback(() => {
     if (gameOver) {
-      router.back();
+      safeBack(router, '/games');
       return;
     }
     Alert.alert(
@@ -52,7 +55,7 @@ export default function BugHunterScreen() {
       'Your progress will be lost!',
       [
         { text: 'KEEP PLAYING', style: 'cancel' },
-        { text: 'QUIT', style: 'destructive', onPress: () => router.back() },
+        { text: 'QUIT', style: 'destructive', onPress: () => safeBack(router, '/games') },
       ]
     );
   }, [gameOver, router]);
@@ -75,7 +78,7 @@ export default function BugHunterScreen() {
       setChallenges(res.data.challenges);
     } catch (e) {
       Alert.alert('ERROR', 'Failed to load game');
-      router.back();
+      safeBack(router, '/games');
     } finally {
       setLoading(false);
     }
@@ -176,7 +179,7 @@ export default function BugHunterScreen() {
               <Ionicons name="refresh" size={18} color="#FF6B6B" />
               <Text style={styles.playAgainText}>PLAY AGAIN</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backToGamesButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backToGamesButton} onPress={() => safeBack(router, '/games')}>
               <Text style={styles.backToGamesText}>BACK TO GAMES</Text>
             </TouchableOpacity>
           </View>

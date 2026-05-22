@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
+import { SettingsProvider } from '../src/context/SettingsContext';
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -29,14 +30,16 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#0D0D0D' },
-          animation: 'slide_from_right',
-        }}
-      />
+      <SettingsProvider>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: '#0D0D0D' },
+            animation: 'slide_from_right',
+          }}
+        />
+      </SettingsProvider>
     </AuthProvider>
   );
 }

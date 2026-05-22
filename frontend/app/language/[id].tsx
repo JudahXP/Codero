@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/services/api';
+import { safeBack } from '../../src/utils/navigation';
 
 interface Lesson {
   id: string;
@@ -110,7 +111,7 @@ export default function LanguageScreen() {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => safeBack(router, '/home')}>
             <Ionicons name="arrow-back" size={24} color="#00FF88" />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
@@ -210,8 +211,6 @@ export default function LanguageScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                  );
-                })}
                   );
                 })}
               </View>
