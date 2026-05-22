@@ -354,6 +354,9 @@ metadata:
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
+  - agent: "main"
+    message: "User approved frontend UI testing for Phase 2. Please verify screenshot issues are resolved: weird/clipped text in profile/settings/lesson/game language selector, logout works, back buttons reliably navigate with fallbacks, font size/high contrast/light mode toggles persist and visibly change UI, notification toggles and email template buttons work, all coding-game languages visible, and sound effects fire on web interactions where browser permits."
+
     priority: "high"
     needs_retesting: false
     status_history:
@@ -437,6 +440,9 @@ agent_communication:
     message: "BACKEND HEALTH CHECK COMPLETE - ALL SYSTEMS OPERATIONAL. Comprehensive testing of auth/login/data persistence completed with 14/14 tests passed (100% success rate). Test results: 1) API health: Root endpoint and /api/languages working. 2) User registration: Fresh timestamped user created with correct defaults (gems=10, hearts=5, settings present). 3) Login: No ObjectId serialization errors, token and user returned correctly. 4) Protected endpoints: /api/auth/me accessible with valid token, unauthorized access correctly rejected (403). 5) Settings persistence: PUT → GET → Re-login all working, settings persisted in MongoDB. 6) Progress/data saving: Lesson completion awards XP (10), gems (+5), badges (first_lesson). Progress persists in MongoDB. User stats updated correctly. Re-completion correctly returns xp_earned=0 with already_completed flag. Test user created: finaltest_20260522_001222@codero.com / secure123test. All critical backend functionality verified and working correctly."
   - agent: "main"
     message: "User approved frontend testing and requested a broad enhancement/fix pass: webapp/desktop responsiveness, code editor/run feedback/hints/challenge types, profile customization with 3 display badges, friend username suggestions, real-user leaderboard, continue learning, wrong-answer review, simulated secure code checking, precise account/data saving, responsive games/buttons, and auth verification/passkey-ready structure with Gmail SMTP credentials. Baseline frontend UI testing requested before implementation."
+  
+  - agent: "testing"
+    message: "PHASE 2 POST-FIX FRONTEND UI TESTING ATTEMPTED. CRITICAL ISSUE FOUND: Login flow not completing via UI - form fills correctly but navigation to home page fails after clicking LOGIN button. API login works (verified via curl), suggesting frontend routing or AuthContext issue. Unable to complete comprehensive UI testing due to authentication blocker. PARTIAL OBSERVATIONS from code review and screenshots: 1) Profile page structure correct with 3 badge slots visible. 2) Settings page has all required toggles (Font Size button, High Contrast, Light Mode, Sound Effects, email notification switches, email template editor). 3) Games page shows language selector. 4) Code structure for back buttons (safeBack utility) implemented. 5) SettingsContext properly manages theme/font/sound/notification persistence. RECOMMENDATION: Main agent must fix login navigation issue - check AuthContext login function, router.replace('/home') call in login.tsx, and AsyncStorage token persistence. After login fix, full UI testing can proceed."
   - agent: "testing"
   - agent: "main"
     message: "Implemented backend changes for Phase 1: Gmail SMTP verification-code endpoints, passkey/Google-ready security options, profile customization + 3 displayed badges persistence, wrong-answer review storage, continue-learning endpoint, secure simulated /code/check endpoint, enriched lessons with predict-output/fix-code/write-code/drag-drop challenge types, friend username suggestions, and authenticated friend/self-only leaderboard. Please test these backend API contracts plus existing auth/data persistence."
