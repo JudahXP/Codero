@@ -26,19 +26,24 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
 
   const handleRegister = async () => {
     if (!username.trim() || !email.trim() || !password.trim()) {
+      setErrorMessage('Please fill in username, email, and password');
       Alert.alert('ERROR', 'Please fill in all fields');
       return;
     }
 
     if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match');
       Alert.alert('ERROR', 'Passwords do not match');
       return;
     }
 
     if (password.length < 4) {
+      setErrorMessage('Password must be at least 4 characters');
       Alert.alert('ERROR', 'Password must be at least 4 characters');
       return;
     }
@@ -48,7 +53,9 @@ export default function RegisterScreen() {
       await register(username.trim(), email.trim(), password);
       router.replace('/verify-email');
     } catch (error: any) {
-      Alert.alert('ERROR', error.response?.data?.detail || 'Registration failed');
+      const message = error.response?.data?.detail || 'Registration failed';
+      setErrorMessage(message);
+      Alert.alert('ERROR', message);
     } finally {
       setLoading(false);
     }
@@ -127,6 +134,13 @@ export default function RegisterScreen() {
                   secureTextEntry={!showPassword}
                 />
               </View>
+
+              {!!errorMessage && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.registerButton}
@@ -229,6 +243,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   registerButtonGradient: {
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.35)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#FFB4B4',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
+
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

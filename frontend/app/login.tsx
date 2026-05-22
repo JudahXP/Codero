@@ -24,9 +24,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
+      setErrorMessage('Please fill in email/username and password');
       Alert.alert('ERROR', 'Please fill in all fields');
       return;
     }
@@ -36,7 +39,9 @@ export default function LoginScreen() {
       const loggedInUser = await login(email.trim(), password);
       router.replace(loggedInUser?.email_verified ? '/home' : '/verify-email');
     } catch (error: any) {
-      Alert.alert('ERROR', error.response?.data?.detail || 'Login failed');
+      const message = error.response?.data?.detail || 'Login failed. Check your username/email and password.';
+      setErrorMessage(message);
+      Alert.alert('ERROR', message);
     } finally {
       setLoading(false);
     }
@@ -86,6 +91,13 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
+              {!!errorMessage && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                   <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#666666" />
                 </TouchableOpacity>
@@ -193,6 +205,24 @@ const styles = StyleSheet.create({
   },
   loginButtonGradient: {
     flexDirection: 'row',
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.35)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#FFB4B4',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
+
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
