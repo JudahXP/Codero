@@ -351,11 +351,11 @@ const styles = StyleSheet.create({
   codeInput: {
     backgroundColor: '#1a1a1a', borderRadius: 12, padding: 16, minHeight: 56,
     fontFamily: 'PressStart2P_400Regular', fontSize: 11, color: '#00FF88',
-    borderWidth: 2, borderColor: 'rgba(255,215,0,0.3)',
+    borderWidth: 0, borderColor: 'rgba(255,215,0,0.3)',
   },
   feedbackBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1,
+    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 0,
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   feedbackTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, marginBottom: 6 },
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   resultsStatText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFF' },
   playAgainButton: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: '#FFD700',
+    backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 0, borderColor: '#FFD700',
     borderRadius: 12, paddingVertical: 14, paddingHorizontal: 24, marginBottom: 12,
   },
   playAgainText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFD700' },

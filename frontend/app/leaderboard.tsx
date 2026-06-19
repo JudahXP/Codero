@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: 'rgba(0, 255, 136, 0.1)',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: '#00FF88',
     justifyContent: 'center',
     alignItems: 'center',
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   rankCardCurrent: {

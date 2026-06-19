@@ -306,13 +306,13 @@ const styles = StyleSheet.create({
   sectionLabel: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#FFF', marginBottom: 10, marginTop: 8 },
   arrangeBox: {
     backgroundColor: 'rgba(0,191,255,0.05)', borderRadius: 12, padding: 12,
-    borderWidth: 2, borderColor: 'rgba(0,191,255,0.2)', borderStyle: 'dashed', minHeight: 60, marginBottom: 16,
+    borderWidth: 0, borderColor: 'rgba(0,191,255,0.2)', borderStyle: 'dashed', minHeight: 60, marginBottom: 16,
   },
   placeholderText: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, color: '#555', textAlign: 'center', paddingVertical: 16 },
   selectedLine: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(0,191,255,0.1)', borderRadius: 8, padding: 10, marginBottom: 6,
-    borderWidth: 1, borderColor: 'rgba(0,191,255,0.3)',
+    borderWidth: 0, borderColor: 'rgba(0,191,255,0.3)',
   },
   lineNumSmall: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#00BFFF', width: 20 },
   selectedLineText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#00BFFF', flex: 1 },
@@ -320,12 +320,12 @@ const styles = StyleSheet.create({
   availableLine: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
   },
   availableLineText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#CCC', flex: 1 },
   feedbackBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1,
+    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 0,
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   feedbackTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, marginBottom: 6 },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   resultsStatText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFF' },
   playAgainButton: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(0,191,255,0.1)', borderWidth: 1, borderColor: '#00BFFF',
+    backgroundColor: 'rgba(0,191,255,0.1)', borderWidth: 0, borderColor: '#00BFFF',
     borderRadius: 12, paddingVertical: 14, paddingHorizontal: 24, marginBottom: 12,
   },
   playAgainText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#00BFFF' },

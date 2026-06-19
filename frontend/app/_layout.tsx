@@ -1,4 +1,6 @@
 import { Stack } from 'expo-router';
+import '../src/styles/globalStylePatch';
+
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
 import { SettingsProvider } from '../src/context/SettingsContext';

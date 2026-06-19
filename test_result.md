@@ -369,6 +369,9 @@ metadata:
   - agent: "testing"
     message: "V1.7 frontend regression completed after inline form-error fixes: login reaches home, invalid password shows inline error, mismatched register passwords show inline error, duplicate username/email backend errors are visible inline, verify-email has no skip button and resend works, settings template editor remains removed and toggles do not kick users out, profile logout button is visible/implemented. Final preview login screenshot reached /home successfully."
 
+  - agent: "main"
+    message: "Cleanup pass implemented: global style patch to reduce black/un-styled/tiny text and remove text input outlines, favicon/app icons replaced with uploaded Codero.png, lesson Show Answer UI removed, fallback hints improved, Unit 0 expanded to 6 beginner-friendly lessons per language, tutorial gating updated to unit0_1, and frontend export/backend lint pass. Please test backend lesson list/gating/wrong-review and frontend visual cleanup."
+
   - agent: "testing"
     message: "CODERO V1.7 COMPREHENSIVE FRONTEND UI TESTING COMPLETE. Tested at https://codero-stack.preview.emergentagent.com with verified user phase2test_1779461004@codero.com. PASSED TESTS (14/18): ✅ Login with verified email routes to /home correctly. ✅ Settings page has NO user-facing email template editor (removed as required). ✅ Email notification toggles present (ALL EMAIL NOTIFICATIONS, LOGIN EMAILS, JOIN EMAILS, VIP EMAILS, DAILY REMINDERS). ✅ Light mode toggle works and persists across Settings/Home/Games screens with readable UI. ✅ Logout button visible on profile (dialog handling needs verification). ✅ Tutorial unit visible in Python lessons. ✅ Games page shows '20 AVAILABLE' languages with all 3 game types (Bug Hunter, Code Puzzle, Speed Code). ✅ Verification screen accessible with code input, VERIFY + CONTINUE and RESEND CODE buttons, NO skip/verify-later button found. ✅ Button spacing appears correct across Home/Settings/Games with no obvious overlaps. ✅ Friends page structure correct. ISSUES FOUND (4): ⚠ Invalid password error: Backend returns 401 (verified in console logs) but error message not clearly displayed in UI - Alert may not be visible in Playwright. ⚠ Mismatched password error: Backend validation works but UI error message not clearly captured. ⚠ Duplicate username error: Backend returns 400 (verified in console logs) but error message display unclear in test. ⚠ Friends page: 'undefined' text detected in page content (likely React Native hydration logs, not user-visible). NOTES: Admin tag not visible for test user (expected - user is not admin). Practice mode button not visible on language screen (may require different navigation). Logout confirmation dialog handling unclear in automated test. Console logs confirm backend errors are being returned correctly (401 for invalid login, 400 for duplicate registration). All critical V1.7 features verified working."
 
@@ -689,15 +692,80 @@ backend:
         agent: "testing"
         comment: "Duplicate registration validation working correctly (2/2 tests passed). Duplicate username returns 400 with clear message 'Username is already taken' (case-insensitive validation). Duplicate email returns 400 with clear message 'Email already has an account' (case-insensitive validation). Both validations user-friendly and production-ready."
 
+
+  - task: "V1.7 Cleanup: Unit 0 Lesson Structure"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Unit 0 lesson structure verified for all languages (2/2 tests passed). Python has 6 Unit 0 lessons (python_unit0_1 through python_unit0_6) as first lessons, all with is_tutorial=true, unit=0, and beginner-friendly titles/descriptions. Same Unit 0 structure verified for skript, javascript, and haskell (all have 6 Unit 0 lessons with correct IDs and is_tutorial=true). Lesson titles include 'Welcome to Coding', 'Reading Questions', 'Using Hints', 'Writing Your First Line', 'Fixing Mistakes', 'Ready for Real Lessons'. All Unit 0 lessons properly positioned before Unit 1 lessons."
+
+  - task: "V1.7 Cleanup: Tutorial Gating with python_unit0_1"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Tutorial gating updated to python_unit0_1 and working correctly (1/1 test passed). Attempting to complete python_1_1 before python_unit0_1 returns 403 with message 'Complete the Tutorial unit before starting other lessons'. After completing python_unit0_1 with correct answers (XP earned: 7), python_1_1 completion succeeds (XP earned: 8). Tutorial gate checks for completed python_unit0_1 in MongoDB progress collection before allowing non-tutorial lessons. Gating logic uses lesson.get('is_tutorial') flag and tutorial_id = f'{language}_unit0_1'."
+
+  - task: "V1.7 Cleanup: Fix-Broken-Code Empty Starter"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Fix-broken-code exercises have empty starter as required (1/1 test passed). Verified across python, javascript, and haskell lessons. All fix_broken_code exercises have starter='' (empty string), allowing users to write code from scratch. Exercise generation logic sets ex['starter'] = '' for fix_broken_code type (first code exercise in each lesson converted to fix_broken_code)."
+
+  - task: "V1.7 Cleanup: Wrong-Answer Review Response"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Wrong-answer review response working correctly (1/1 test passed). POST /api/progress/complete with wrong answers returns wrong_review array with 8 items (for 8 wrong answers in python_1_1). Each wrong_review item includes: question (challenge text), expected_answer (correct answer), explanation (simple error explanation). Structure verified: all fields present and non-empty. Wrong answers also saved to MongoDB via save_wrong_answer function for later review. Review response works in both normal and practice modes."
+
+  - task: "V1.7 Cleanup: Auth and Settings Health Check"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Auth and settings endpoints healthy (1/1 test passed). POST /api/auth/register creates user with gems=10, hearts=5, and default settings. POST /api/auth/login returns token and user data. GET /api/auth/me returns user profile. GET /api/settings returns all settings (theme, font_size, sound_effects, etc.). PUT /api/settings updates and persists settings (verified theme=light, font_size=large persisted). All endpoints working correctly with no regressions."
+
 metadata:
   created_by: "testing_agent"
-  version: "4.1"
-  test_sequence: 5
+  version: "4.2"
+  test_sequence: 6
   run_ui: false
 
 test_plan:
   current_focus:
-    - "V1.7 Latest Auth/Email Changes Verified"
+    - "V1.7 Cleanup Retest Complete"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "CODERO V1.7 CLEANUP RETEST COMPLETE - 6/6 TESTS PASSED (100% SUCCESS RATE). Backend cleanup verification completed successfully. All requirements verified: 1) ✅ Unit 0 Lesson Structure (2/2 tests): Python has 6 Unit 0 lessons (python_unit0_1 through python_unit0_6) as first lessons, all with is_tutorial=true and beginner-friendly titles. Same structure verified for skript, javascript, and haskell. 2) ✅ Tutorial Gating (1/1 test): python_1_1 blocked with 403 before completing python_unit0_1. After completing python_unit0_1, python_1_1 allowed. Tutorial gate checks for python_unit0_1 completion in MongoDB. 3) ✅ Fix-Broken-Code Empty Starter (1/1 test): All fix_broken_code exercises have starter='' across python, javascript, haskell. 4) ✅ Wrong-Answer Review (1/1 test): POST /api/progress/complete with wrong answers returns wrong_review array with question, expected_answer, and explanation for each wrong answer. 5) ✅ Auth and Settings Health (1/1 test): Registration, login, /auth/me, GET/PUT /settings all working correctly with no regressions. Test users: gatetest_1781886695@codero.com, wrongtest_1781886696@codero.com, healthtest_1781886697@codero.com. All cleanup requirements verified and production-ready."

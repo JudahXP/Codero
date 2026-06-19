@@ -320,19 +320,19 @@ const styles = StyleSheet.create({
   conceptText: { fontFamily: 'PressStart2P_400Regular', fontSize: 6, color: '#FFD700' },
   question: { fontFamily: 'PressStart2P_400Regular', fontSize: 11, color: '#FFF', lineHeight: 20, marginBottom: 16 },
   codeBlock: {
-    backgroundColor: '#1a1a1a', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#333', marginBottom: 20,
+    backgroundColor: '#1a1a1a', borderRadius: 12, padding: 14, borderWidth: 0, borderColor: '#333', marginBottom: 20,
   },
   codeLine: { flexDirection: 'row', marginBottom: 4 },
   lineNum: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#555', width: 24 },
   codeText: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FF6B6B' },
   optionsContainer: { gap: 10 },
   optionButton: {
-    borderRadius: 12, padding: 14, borderWidth: 2,
+    borderRadius: 12, padding: 14, borderWidth: 0,
   },
   optionText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#DDD' },
   feedbackBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1,
+    borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 0,
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   feedbackTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, marginBottom: 6 },
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   resultsStatText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFF' },
   playAgainButton: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 1, borderColor: '#FF6B6B',
+    backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 0, borderColor: '#FF6B6B',
     borderRadius: 12, paddingVertical: 14, paddingHorizontal: 24, marginBottom: 12,
   },
   playAgainText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FF6B6B' },

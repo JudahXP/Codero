@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
   closeButton: {
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(0, 191, 255, 0.1)', borderWidth: 1, borderColor: '#00BFFF',
+    backgroundColor: 'rgba(0, 191, 255, 0.1)', borderWidth: 0, borderColor: '#00BFFF',
     justifyContent: 'center', alignItems: 'center',
   },
   modeTabs: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 4 },
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 24 },
   sectionTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#FFD700', marginBottom: 12 },
   explanationText: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#CCC', lineHeight: 18 },
-  codeBlock: { backgroundColor: '#1a1a1a', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#333' },
+  codeBlock: { backgroundColor: '#1a1a1a', borderRadius: 8, padding: 12, borderWidth: 0, borderColor: '#333' },
   codeText: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#00FF88' },
   exampleCard: { marginBottom: 12 },
   outputBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingLeft: 12 },
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   optionsContainer: { gap: 10 },
   optionButton: {
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
   },
   optionSelected: { borderColor: '#00BFFF', backgroundColor: 'rgba(0, 191, 255, 0.1)' },
   optionCorrect: { borderColor: '#00FF88', backgroundColor: 'rgba(0, 255, 136, 0.1)' },
@@ -482,12 +482,12 @@ const styles = StyleSheet.create({
   optionTextSelected: { color: '#FFF' },
   codeInput: {
     backgroundColor: '#1a1a1a', borderRadius: 12, padding: 16, minHeight: 120,
-    fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#00FF88', borderWidth: 1, borderColor: '#333',
+    fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#00FF88', borderWidth: 0, borderColor: '#333',
   },
   fillInput: {
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16,
     fontFamily: 'PressStart2P_400Regular', fontSize: 12, color: '#FFF', textAlign: 'center',
-    borderWidth: 2, borderColor: 'rgba(0, 191, 255, 0.3)',
+    borderWidth: 0, borderColor: 'rgba(0, 191, 255, 0.3)',
   },
   solutionBox: { backgroundColor: 'rgba(0, 255, 136, 0.1)', borderRadius: 8, padding: 12, marginTop: 12 },
   solutionLabel: { fontFamily: 'PressStart2P_400Regular', fontSize: 8, color: '#00FF88', marginBottom: 8 },
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: 'rgba(0, 191, 255, 0.1)', borderRadius: 12, paddingVertical: 14,
-    borderWidth: 1, borderColor: '#00BFFF',
+    borderWidth: 0, borderColor: '#00BFFF',
   },
   retryText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#00BFFF' },
   lessonButton: { borderRadius: 12, overflow: 'hidden' },

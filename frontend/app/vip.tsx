@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: '#FFD700',
+    backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 0, borderColor: '#FFD700',
     justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 12, color: '#FFD700' },
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   badgeSection: { alignItems: 'center', paddingVertical: 24 },
   bigBadge: {
     width: 100, height: 100, borderRadius: 50,
-    backgroundColor: 'rgba(85,85,85,0.2)', borderWidth: 3, borderColor: '#333',
+    backgroundColor: 'rgba(85,85,85,0.2)', borderWidth: 0, borderColor: '#333',
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
   bigBadgeActive: { backgroundColor: 'rgba(255,215,0,0.15)', borderColor: '#FFD700' },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   statusDesc: { fontFamily: 'PressStart2P_400Regular', fontSize: 7, color: '#888', textAlign: 'center', lineHeight: 14 },
   progressSection: {
     backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 16, marginBottom: 24,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
   },
   progressHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   progressLabel: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFF' },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
   dayDot: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center', alignItems: 'center',
   },
   dayDotActive: { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' },
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   perkCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
   },
   perkLocked: { opacity: 0.5 },
   perkIcon: {
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   perkDesc: { fontFamily: 'PressStart2P_400Regular', fontSize: 6, color: '#888' },
   howToSection: {
     backgroundColor: 'rgba(255,215,0,0.05)', borderRadius: 16, padding: 16, marginTop: 16,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.1)',
+    borderWidth: 0, borderColor: 'rgba(255,215,0,0.1)',
   },
   howToTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFD700', marginBottom: 16 },
   howToStep: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },

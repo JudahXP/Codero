@@ -369,14 +369,14 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
   backButton: {
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(0, 255, 136, 0.1)', borderWidth: 1, borderColor: '#00FF88',
+    backgroundColor: 'rgba(0, 255, 136, 0.1)', borderWidth: 0, borderColor: '#00FF88',
     justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 12, color: '#FFD700' },
   challengeIntro: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   challengeIconBox: {
     width: 100, height: 100, borderRadius: 50,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)', borderWidth: 2, borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)', borderWidth: 0, borderColor: '#FFD700',
     justifyContent: 'center', alignItems: 'center', marginBottom: 24,
   },
   challengeTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 16, color: '#FFD700', marginBottom: 12 },
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   completedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0, 255, 136, 0.1)', borderRadius: 12,
-    paddingHorizontal: 20, paddingVertical: 16, borderWidth: 1, borderColor: '#00FF88',
+    paddingHorizontal: 20, paddingVertical: 16, borderWidth: 0, borderColor: '#00FF88',
   },
   completedText: { fontFamily: 'PressStart2P_400Regular', fontSize: 10, color: '#00FF88' },
   timerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
@@ -409,19 +409,19 @@ const styles = StyleSheet.create({
   optionsContainer: { gap: 12 },
   optionButton: {
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
   },
   optionSelected: { borderColor: '#FFD700', backgroundColor: 'rgba(255, 215, 0, 0.1)' },
   optionText: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#AAA' },
   optionTextSelected: { color: '#FFD700' },
   codeInput: {
     backgroundColor: '#1a1a1a', borderRadius: 12, padding: 16, minHeight: 120,
-    fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#00FF88', borderWidth: 1, borderColor: '#333',
+    fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#00FF88', borderWidth: 0, borderColor: '#333',
   },
   fillInput: {
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16,
     fontFamily: 'PressStart2P_400Regular', fontSize: 12, color: '#FFF', textAlign: 'center',
-    borderWidth: 2, borderColor: 'rgba(255, 215, 0, 0.3)',
+    borderWidth: 0, borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   footer: { padding: 20 },
   submitButton: { borderRadius: 12, overflow: 'hidden' },

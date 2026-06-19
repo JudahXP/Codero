@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: 'rgba(0, 255, 136, 0.1)',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: '#00FF88',
     justifyContent: 'center',
     alignItems: 'center',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statItem: {
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(0, 255, 136, 0.35)',
   },
   continueLearningGradient: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   languageIcon: {

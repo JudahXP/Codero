@@ -421,14 +421,6 @@ export default function LessonScreen() {
                 <View style={styles.feedbackTextWrap}>
                   <Text style={styles.feedbackTitle}>{feedback.correct ? 'Success!' : 'Not quite yet'}</Text>
                   <Text style={styles.feedbackText}>{feedback.simple_explanation || feedback.message}</Text>
-                  {!feedback.correct && feedback.expected_answer && showAnswer && (
-                    <Text style={styles.answerText}>Answer: {Array.isArray(feedback.expected_answer) ? feedback.expected_answer.join(' / ') : String(feedback.expected_answer)}</Text>
-                  )}
-                  {!feedback.correct && !showAnswer && (
-                    <TouchableOpacity style={styles.showAnswerButton} onPress={() => setShowAnswer(true)}>
-                      <Text style={styles.showAnswerText}>Show full answer</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </View>
             )}
@@ -603,7 +595,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     padding: 16,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   optionSelected: {
@@ -614,7 +606,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: '#555',
     marginRight: 12,
     justifyContent: 'center',
@@ -636,7 +628,7 @@ const styles = StyleSheet.create({
   codeContainer: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: '#333',
     minHeight: 150,
   },
@@ -672,7 +664,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(0, 255, 136, 0.35)',
     padding: 14,
     minHeight: 48,
@@ -693,7 +685,7 @@ const styles = StyleSheet.create({
   fillContainer: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: 'rgba(0, 255, 136, 0.3)',
   },
   fillInput: {
@@ -709,7 +701,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     alignSelf: 'center',
-  reviewPanel: { width: '100%', maxHeight: 220, marginTop: 16, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.35)', backgroundColor: 'rgba(255, 215, 0, 0.08)' },
+  reviewPanel: { width: '100%', maxHeight: 220, marginTop: 16, borderRadius: 14, borderWidth: 0, borderColor: 'rgba(255, 215, 0, 0.35)', backgroundColor: 'rgba(255, 215, 0, 0.08)' },
   reviewContent: { padding: 14, gap: 10 },
   reviewTitle: { fontFamily: 'PressStart2P_400Regular', fontSize: 9, color: '#FFD700', marginBottom: 4 },
   reviewItem: { gap: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.12)' },
@@ -727,7 +719,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginTop: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   hintText: {
@@ -741,7 +733,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     marginTop: 16,
   },
   feedbackSuccess: {

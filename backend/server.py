@@ -164,7 +164,7 @@ def explain_error_simple(message: str) -> str:
         return "The blank does not match yet. Check spelling and symbols."
     if "order" in lower:
         return "The blocks are not in the right order yet. Put setup first, logic next, output last."
-    return "Something is close, but not exact yet. Compare the goal, syntax, and missing keywords."
+    return "Think about the goal first. Look for the keyword, symbol, or output command this lesson just introduced."
 
 def check_exercise_answer(exercise: dict, user_answer: dict, language: str) -> tuple:
     """Simulated, safe code checking. No arbitrary code is executed."""
@@ -1176,6 +1176,37 @@ def generate_exercises(language_id: str, topic: str, unit: int) -> List[dict]:
     
     return exercises
 
+
+def make_unit0_lessons(language_id: str) -> List[dict]:
+    lang_name = get_language_name(language_id) if 'get_language_name' in globals() else language_id.replace('_', ' ').title()
+    topics = [
+        ("Welcome to Coding", "Understand what code is and how Codero lessons work", "Code is a list of instructions a computer follows."),
+        ("Reading Questions", "Learn how to read a challenge before answering", "Read the goal first, then compare every option carefully."),
+        ("Using Hints", "Practice using hints without spoiling the answer", "A hint points you in the right direction without giving everything away."),
+        ("Writing Your First Line", f"Write one simple {lang_name} output line", "Small working code is better than guessing a big answer."),
+        ("Fixing Mistakes", "Learn how wrong answers become review cards", "Mistakes are saved so you can review what to improve."),
+        ("Ready for Real Lessons", f"Finish the {lang_name} starter path", "Complete Unit 0 to unlock the main beginner lessons."),
+    ]
+    lessons = []
+    for index, (title, description, concept) in enumerate(topics, 1):
+        lesson_id = f"{language_id}_unit0_{index}"
+        lessons.append({
+            "id": lesson_id,
+            "title": f"Unit 0.{index}: {title}",
+            "description": description,
+            "xp": 10 + index,
+            "unit": 0,
+            "unit_name": "Unit 0: Getting Started",
+            "is_tutorial": True,
+            "exercises": [
+                {"type": "multiple_choice", "question": f"In {lang_name}, what should you do first when a challenge appears?", "options": ["Read the goal", "Guess fast", "Skip hints", "Close the lesson"], "correct": 0, "hint": f"Start by understanding what this {lang_name} lesson is asking.", "explanation": concept},
+                {"type": "fill_blank", "question": "A helpful hint should guide you without giving the full ___", "answer": "answer", "hint": "You still do the thinking.", "explanation": "Hints help you learn step by step."},
+                {"type": "write_code", "question": f"Write a simple {lang_name} note that says you are ready.", "starter": "", "solution": "print('I am ready')", "hint": f"Use the simplest output command style you know for {lang_name}.", "explanation": "This checks that you can type an answer instead of relying on prefilled code."},
+            ],
+            "practice_content": {"summary": description, "examples": [concept, "Use hints before checking the answer", "Review missed questions at the end"]},
+        })
+    return lessons
+
 def generate_lessons(language_id: str) -> List[dict]:
     """Generate lessons with practice content"""
     units_config = {
@@ -1258,21 +1289,7 @@ def generate_lessons(language_id: str) -> List[dict]:
         ]
     
     lessons = []
-    lessons.append({
-        "id": f"{language_id}_tutorial_intro",
-        "title": "Tutorial: How Codero Works",
-        "description": "Learn how to answer, run code, use hints, and review mistakes before moving on.",
-        "xp": 10,
-        "unit": 0,
-        "unit_name": "Tutorial",
-        "is_tutorial": True,
-        "exercises": [
-            {"type": "multiple_choice", "question": "What should you do before showing the full answer?", "options": ["Try the hint", "Skip everything", "Logout", "Ignore feedback"], "correct": 0, "hint": "Hints help you learn without spoiling the answer."},
-            {"type": "fill_blank", "question": "Type RUN to confirm you know where the run/check button is: ___", "answer": "RUN", "hint": "The button checks your answer."},
-            {"type": "write_code", "question": "Write a hello output line.", "starter": "", "solution": "print('Hello Codero')", "hint": "Use print with the exact words Hello Codero."},
-        ],
-        "practice_content": {"summary": "Practice the tutorial skills any time.", "examples": ["Use hints first", "Review wrong answers", "Complete the lesson to unlock more content"]},
-    })
+    lessons.extend(make_unit0_lessons(language_id))
     for unit_num, (unit_name, topics) in enumerate(units, 1):
         for topic_idx, topic in enumerate(topics):
             lesson_id = f"{language_id}_{unit_num}_{topic_idx + 1}"
@@ -1818,7 +1835,7 @@ async def complete_lesson(answer: LessonAnswer, user: dict = Depends(get_current
             break
 
     if not lesson.get("is_tutorial"):
-        tutorial_id = f"{answer.language}_tutorial_intro"
+        tutorial_id = f"{answer.language}_unit0_1"
         tutorial_done = await db.progress.find_one({"user_id": user["id"], "language": answer.language, "lesson_id": tutorial_id, "completed": True})
         if not tutorial_done:
             raise HTTPException(status_code=403, detail="Complete the Tutorial unit before starting other lessons")
